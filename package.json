@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "vite-react-ssg build",
     "preview": "vite preview",
-    "deploy": "gh-pages -d dist"
+    "deploy": "gh-pages -d dist",
+    "resume": "node scripts/resume.mjs"
   },
   "dependencies": {
     "react": "^19.1.0",

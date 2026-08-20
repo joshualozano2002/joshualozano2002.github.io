@@ -88,6 +88,26 @@ fails before running a step while `build` still passes.
 Canonical URLs, Open Graph tags and the sitemap all read `VITE_SITE_ORIGIN`,
 so they follow automatically. Nothing else needs editing.
 
+## The resume PDF
+
+`npm run resume` regenerates `public/media/Joshua-Lozano-Resume.pdf` from the
+same `src/data` files the site renders, so the PDF and `/dossier` cannot drift
+apart. Run it after editing experience, education, or skills.
+
+It renders through headless Chrome (override with `CHROME_PATH` if Chrome is
+installed elsewhere). Two constraints are deliberate:
+
+- **System fonts, not a web font.** Chrome converts `@font-face` fonts into
+  Type3 glyph programs when printing. The text is still selectable, but some
+  resume parsers cannot read Type3. A locally installed family embeds as real
+  TrueType instead.
+- **One page.** `BULLET_CAPS` in `scripts/resume.mjs` trims each role to its
+  most important points, which is why bullets are ordered by importance in
+  `src/data/dossier.js`. The web page can be exhaustive; print should not be.
+
+The phone number is intentionally absent — the PDF is served from a public URL,
+so it is exactly as scrapeable as the HTML. Add it for direct applications.
+
 ## Where the content lives
 
 All copy is data, not markup — edit these rather than the components:

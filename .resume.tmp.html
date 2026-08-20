@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Joshua Lozano — Resume</title>
+<style>
+
+  @page { size: Letter; margin: 0.4in 0.5in; }
+
+  :root {
+    --ink: #14181d;
+    --muted: #4a545f;
+    --faint: #6b7783;
+    --rule: #c8d0d8;
+    --accent: #9a5b12;   /* print-safe counterpart to the site's amber */
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    /* A locally installed family, deliberately. Chrome rasterises @font-face
+       web fonts into Type3 glyph programs when printing, which some resume
+       parsers cannot read; system fonts embed as real TrueType instead. */
+    font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    font-size: 8.9pt;
+    line-height: 1.25;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  a { color: inherit; text-decoration: none; }
+
+  header { margin-bottom: 9pt; }
+
+  h1 {
+    font-size: 19.5pt;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.05;
+  }
+
+  .role {
+    margin-top: 2.5pt;
+    font-size: 9.6pt;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  .contact {
+    margin-top: 4.5pt;
+    font-size: 8.5pt;
+    color: var(--muted);
+  }
+  .contact span + span::before { content: '  ·  '; color: var(--rule); }
+
+  h2 {
+    font-size: 8.3pt;
+    font-weight: 700;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    border-bottom: 0.7pt solid var(--rule);
+    padding-bottom: 2.5pt;
+    margin: 8pt 0 4.5pt;
+  }
+
+  .entry { margin-bottom: 6pt; break-inside: avoid; }
+  .entry:last-child { margin-bottom: 0; }
+
+  .line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 12pt;
+  }
+
+  .org { font-size: 10.2pt; font-weight: 700; }
+  .where { font-size: 8.4pt; color: var(--faint); white-space: nowrap; }
+  .title { font-size: 9.2pt; font-weight: 500; color: var(--muted); font-style: italic; }
+  .when { font-size: 8.4pt; color: var(--faint); white-space: nowrap; }
+
+  .blurb { margin-top: 2.5pt; font-size: 8.6pt; color: var(--faint); }
+
+  ul { margin: 3.5pt 0 0; padding-left: 10.5pt; list-style: none; }
+  li { position: relative; margin-bottom: 1.8pt; }
+  li::before {
+    content: '';
+    position: absolute;
+    left: -8.5pt;
+    top: 4.4pt;
+    width: 2.6pt;
+    height: 2.6pt;
+    background: var(--accent);
+    border-radius: 50%;
+  }
+
+  .proj { margin-bottom: 3.4pt; break-inside: avoid; }
+  .proj-name { font-weight: 700; }
+  .proj-stack { color: var(--faint); font-size: 8.4pt; }
+  .proj-desc { color: var(--muted); }
+
+  .skills { display: grid; grid-template-columns: 1fr 1fr; gap: 2.6pt 16pt; }
+  .skill { font-size: 8.8pt; color: var(--muted); break-inside: avoid; }
+  .skill b { color: var(--ink); font-weight: 700; }
+
+  .course { margin-top: 3pt; font-size: 8.5pt; color: var(--muted); }
+  .course b { color: var(--ink); font-weight: 700; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Joshua Lozano</h1>
+  <div class="role">Operations &amp; Technical Program Coordinator · PA-AI  ·  Vice President, Modern Faith Works</div>
+  <div class="contact"><span><a href="mailto:joshualozano2002@gmail.com">joshualozano2002@gmail.com</a></span><span><a href="https://joshualozano2002.github.io">joshualozano2002.github.io</a></span><span><a href="https://github.com/joshualozano2002">github.com/joshualozano2002</a></span><span><a href="https://www.linkedin.com/in/joshua-lozano7/">linkedin.com/in/joshua-lozano7</a></span></div>
+</header>
+
+<h2>Experience</h2>
+<div class="entry">
+  <div class="line"><span class="org">PA-AI</span><span class="where">Remote</span></div>
+  <div class="line"><span class="title">Operations &amp; Technical Program Coordinator</span><span class="when">2026 — Present</span></div>
+  <div class="blurb">Strategic intelligence platform built on the Psycho-Aesthetics® methodology, positioned as a human intelligence layer for AI.</div>
+  <ul><li>Own release quality for the staging platform: run structured QA passes, file and track defects to resolution, verify engineering fix claims against spec, and publish written summaries to engineering and leadership.</li><li>Authored a 19-requirement specification with working reference implementations to remediate slide-deck export defects, and ran 15 graded audit rounds on generator output quality across briefs, reports, and HTML decks.</li><li>Led a 642-issue backlog remediation in Linear alongside the product lead — triage, status normalization, ownership labeling, and a three-contract reconciliation workbook.</li><li>Built the customer support infrastructure end to end: 29 help articles, an AI support agent trained on internal product material, a redesigned Help Center, and the canonical product vocabulary the content is written against.</li></ul>
+</div><div class="entry">
+  <div class="line"><span class="org">Modern Faith Works</span><span class="where">California</span></div>
+  <div class="line"><span class="title">Vice President</span><span class="when">2026 — Present</span></div>
+  <div class="blurb">A registered 501(c)(3) non-profit documenting and preserving the history, art, and spirituality of California’s Catholic churches.</div>
+  <ul><li>Serve on the board of the organization while acting as sole developer of its public platform, built continuously since June 2025.</li><li>Designed and built a bilingual application serving the web and Android from a single React Native codebase, backed by a Node and Express API on MongoDB with a Redis cache layer.</li><li>Built the interior walkthrough system — 360° and flat-photo nodes with tap-to-move navigation and catalogued artifacts pinned to photographs — and covered its geometry with an assertion suite that runs on every pull request.</li></ul>
+</div><div class="entry">
+  <div class="line"><span class="org">NASA</span><span class="where">UC Irvine, CA</span></div>
+  <div class="line"><span class="title">Research Intern — Student Airborne Research Program</span><span class="when">June 2024 — August 2024</span></div>
+  
+  <ul><li>Processed and analyzed large atmospheric datasets with Python, Matplotlib, Pandas, and NumPy, generating the visualizations that supported the research findings.</li><li>Designed and executed an independent research project on VOC composition and ozone formation potential, automating the statistical comparison of VOC levels and OH reactivity between 2014 and 2022.</li><li>Used QGIS for geospatial analysis, mapping VOC concentrations over Long Beach and integrating environmental data for trend analysis.</li></ul>
+</div>
+
+<h2>Selected Projects</h2>
+<div class="proj"><span class="proj-name">Modern Faith Works</span><span class="proj-stack"> · React Native, Expo, Node.js, Express</span> <span class="proj-desc">— A bilingual guide to California’s Catholic churches: a place directory with interactive interior walkthroughs, and a daily practice layer, on web and Android from one React Native codebase.</span></div><div class="proj"><span class="proj-name">Wildfire Classifier</span><span class="proj-stack"> · Python, YOLOv8, PyTorch, OpenCV</span> <span class="proj-desc">— A YOLOv8 detection pipeline that finds fire and smoke in mountain camera footage and classifies the threat it is looking at.</span></div><div class="proj"><span class="proj-name">C-like Language Interpreter</span><span class="proj-stack"> · C++, DFA, Recursive Descent, LCRS Trees</span> <span class="proj-desc">— A complete interpreter for a C-like language defined in Backus-Naur Form, built from the raw character stream up to a running program.</span></div>
+
+<h2>Education</h2>
+<div class="entry">
+  <div class="line"><span class="org">Sonoma State University</span><span class="where">Rohnert Park, CA</span></div>
+  <div class="line"><span class="title">BS Computer Science · GPA 3.5</span><span class="when">2020 — 2025</span></div>
+  <div class="blurb">Dean's List, 2022 — 2025</div>
+  <div class="course"><b>Relevant coursework:</b> Algorithms Analysis, Data Structures, Software Design and Development, Programming Languages, Operating Systems, Theory of Computation.</div>
+</div>
+
+<h2>Skills</h2>
+<div class="skills">
+<div class="skill"><b>Languages:</b> C, C++, Python, SQL, x86 Assembly, ARM Assembly</div>
+<div class="skill"><b>Machine Learning:</b> PyTorch, TensorFlow, Keras, scikit-learn, YOLOv8, OpenCV</div>
+<div class="skill"><b>Data:</b> Pandas, NumPy, Matplotlib, Jupyter, QGIS</div>
+<div class="skill"><b>Web &amp; Mobile:</b> React, React Native, Expo, Node.js, Express, MongoDB, Redis</div>
+<div class="skill"><b>Systems &amp; Tools:</b> Unix, Git, Threads, CLion, Unreal Engine, Curses</div>
+<div class="skill"><b>Product Operations:</b> Linear, Intercom, Stripe, PostHog, Freshsales, Vercel</div>
+</div>
+
+</body>
+</html>
