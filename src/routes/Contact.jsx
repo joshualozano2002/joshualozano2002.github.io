@@ -7,6 +7,13 @@ const channels = [
   { label: 'Email', value: 'joshualozano2002@gmail.com', href: `mailto:${profile.email}`, code: 'PRI' },
   { label: 'GitHub', value: 'joshualozano2002', href: profile.github, code: 'SEC', ext: true },
   { label: 'LinkedIn', value: 'joshua-lozano7', href: profile.linkedin, code: 'SEC', ext: true },
+  {
+    label: 'Modern Faith Works',
+    value: 'modernfaithworks.org · Vice President',
+    href: profile.affiliation.url,
+    code: 'ORG',
+    ext: true,
+  },
 ]
 
 export default function Contact() {

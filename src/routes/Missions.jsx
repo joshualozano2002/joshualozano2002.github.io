@@ -8,7 +8,7 @@ export default function Missions() {
     <>
       <Seo
         title="Missions"
-        description="Project records: a YOLOv8 wildfire detection pipeline, a C-like language interpreter built from scratch, an HTML tag validator, a Kruskal maze solver, and this statically prerendered site."
+        description="Project records: a bilingual React Native church guide built solo for a non-profit, a YOLOv8 wildfire detection pipeline, a C-like language interpreter built from scratch, an HTML tag validator, a Kruskal maze solver, and this statically prerendered site."
         path="/missions"
       />
 
@@ -20,7 +20,7 @@ export default function Missions() {
             Missions
           </h1>
           <p className="mt-5 max-w-2xl text-base leading-relaxed text-dim text-pretty">
-            Five records. Each one is a system I built end to end, with the parts that were actually
+            Six records. Each one is a system I built end to end, with the parts that were actually
             hard written down rather than skipped.
           </p>
         </div>

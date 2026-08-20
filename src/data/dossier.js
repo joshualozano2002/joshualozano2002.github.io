@@ -50,6 +50,24 @@ export const dossier = {
       ],
     },
     {
+      org: 'Modern Faith Works',
+      place: 'California',
+      role: 'Vice President',
+      period: '2026 \u2014 Present',
+      current: true,
+      url: 'https://modernfaithworks.org',
+      summary:
+        'A registered 501(c)(3) non-profit documenting and preserving the history, art, and spirituality of California\u2019s Catholic churches.',
+      bullets: [
+        'Serve on the board of the organization while acting as sole developer of its public platform, built continuously since June 2025.',
+        'Designed and built a bilingual application serving the web and Android from a single React Native codebase, backed by a Node and Express API on MongoDB with a Redis cache layer.',
+        'Built the interior walkthrough system \u2014 360\u00b0 and flat-photo nodes with tap-to-move navigation and catalogued artifacts pinned to photographs \u2014 and covered its geometry with an assertion suite that runs on every pull request.',
+        'Built the bilingual content pipeline: lectionary readings parsed server-side in both languages, a liturgical calendar merging an external API with a computed fallback, and generated narration in English and Spanish.',
+        'Engineered the whole system onto free tiers to fit an organization with no operating budget, holding total infrastructure to $7 per month, and automated backups, scraping, and reporting as scheduled CI jobs.',
+        'Built the admin platform behind it: content and narration editors, analytics dashboards, CSV import and export, TOTP two-factor authentication written from scratch, an audit log, and a session kill-switch.',
+      ],
+    },
+    {
       org: 'NASA',
       place: 'UC Irvine, CA',
       role: 'Research Intern — Student Airborne Research Program',
@@ -70,6 +88,10 @@ export const dossier = {
     { group: 'Languages', items: ['C', 'C++', 'Python', 'SQL', 'x86 Assembly', 'ARM Assembly'] },
     { group: 'Machine Learning', items: ['PyTorch', 'TensorFlow', 'Keras', 'scikit-learn', 'YOLOv8', 'OpenCV'] },
     { group: 'Data', items: ['Pandas', 'NumPy', 'Matplotlib', 'Jupyter', 'QGIS'] },
+    {
+      group: 'Web & Mobile',
+      items: ['React', 'React Native', 'Expo', 'Node.js', 'Express', 'MongoDB', 'Redis'],
+    },
     { group: 'Systems & Tools', items: ['Unix', 'Git', 'Threads', 'CLion', 'Unreal Engine', 'Curses'] },
     {
       group: 'Product Operations',

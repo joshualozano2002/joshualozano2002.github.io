@@ -7,8 +7,65 @@
  */
 export const missions = [
   {
-    slug: 'wildfire-classifier',
+    slug: 'modern-faith-works',
     index: '01',
+    callsign: 'NAVE',
+    title: 'Modern Faith Works',
+    domain: 'Product · Full Stack',
+    year: '2025 \u2014 present',
+    course: 'Modern Faith Works (501(c)(3) non-profit)',
+    accent: 'amber',
+    diagram: 'narration',
+    featured: true,
+    summary:
+      'A bilingual guide to California\u2019s Catholic churches: a place directory with interactive interior walkthroughs, and a daily practice layer, on web and Android from one React Native codebase.',
+    brief: [
+      'Almost nothing inside a Catholic church is documented for the person standing in it. Parish websites go stale \u2014 mass times worst of all \u2014 and there is no visitor-facing layer at all for the altar, statues, windows and relics that make these buildings historically significant. You can walk into a two-hundred-year-old mission and have no way to learn what you are looking at.',
+      'The app answers that by modelling each church interior as a set of catalogued features pinned onto photographs. Tap a dot and you get the written history and studio-voice narration, in English or Spanish. Around that directory sits a practice layer sharing the same backend: daily Mass readings pulled from the official US lectionary, a guided rosary player, a community prayer wall, and a liturgical calendar. Two audiences, one system \u2014 visitors who want to understand a building, and practising Catholics who want daily tools in their own language.',
+      'The binding constraint was economic. This serves a non-profit with essentially no operating budget, so the whole system is engineered onto free tiers: open map tiles instead of Google Maps, free-tier speech synthesis, free CI minutes for every scheduled job. One $7/month server is the entire real infrastructure bill. Several architecture decisions only make sense read through that lens.',
+    ],
+    stack: [
+      'React Native',
+      'Expo',
+      'Node.js',
+      'Express',
+      'MongoDB',
+      'Redis',
+      'MapLibre',
+      'i18next',
+    ],
+    systems: [
+      'One React Native codebase serving the web app and Android from a shared backend',
+      'Church directory with search, themed map pins, mass times, and licensed photography with stored attribution',
+      'Interior walkthroughs across 360\u00b0 and flat-photo nodes, with tap-to-move and guided fly-to-artifact',
+      'Artifact discovery by tapping dots on photographs, with bilingual written history and studio-voice narration',
+      'Daily Mass readings parsed server-side from the official US lectionary in both languages',
+      'Guided rosary player, community prayer wall, and a liturgical calendar with feast ranks and season theming',
+      'Custom admin panel: content editors, narration manager, analytics, CSV import/export, TOTP two-factor and an audit log',
+      'Five scheduled GitHub Actions jobs including a nightly self-verifying encrypted database backup',
+    ],
+    hazards: [
+      'A null config object in standalone Android OTA builds produced three unrelated-looking symptoms at once \u2014 a login crash, a missing sign-in button, and a week of silent error reporting. Diagnosed by pulling the live update manifest off the CDN and parsing the payload to see what devices actually received.',
+      'The bundler resolves require() statically, so a dependency inside an unreachable platform branch still ships. That silently cost the web bundle 242 KB. Platform-split twin files fixed it, and the same property is now used deliberately in reverse to ship JS for native modules over the air before the binary containing them exists.',
+      'Web narration played nothing, with no error anywhere. The content security policy had no media-src directive, so audio fell back to default-src and the CDN was refused \u2014 while images loaded fine, which is exactly what made it hard to see.',
+      'Walkthrough geometry: bearing round-trips under arbitrary panorama rotations shipped two real bugs, including a guided fly-to that flew to the mirror image of its target. Now pinned down by a 72-assertion geometry suite that runs on every pull request.',
+      'The lectionary source rejects descriptive server user agents but accepts others, so the fetch had to be tuned by experiment; the feast calendar merges an external API with a computed Gregorian Easter fallback and caches one language while translating at response time.',
+    ],
+    readouts: [
+      { k: 'Status', v: 'Web live \u00b7 Android internal' },
+      { k: 'Client', v: 'React Native + Expo' },
+      { k: 'Backend', v: 'Node \u00b7 MongoDB \u00b7 Redis' },
+      { k: 'Languages', v: 'EN \u00b7 ES, parity in CI' },
+      { k: 'Tests', v: '243 in CI' },
+      { k: 'Infra cost', v: '$7/month' },
+    ],
+    links: [{ label: 'Visit the live site', href: 'https://modernfaithworks.org', external: true }],
+    note:
+      'Repositories are private. The AI faith-guide and newsletter are built but disabled behind feature flags, and the app is not published to either store \u2014 Android is in sideloaded internal testing and iOS has not been built.',
+  },
+  {
+    slug: 'wildfire-classifier',
+    index: '02',
     callsign: 'EMBER',
     title: 'Wildfire Classifier',
     domain: 'Computer Vision',
@@ -43,7 +100,7 @@ export const missions = [
   },
   {
     slug: 'bnf-interpreter',
-    index: '02',
+    index: '03',
     callsign: 'BABEL',
     title: 'C-like Language Interpreter',
     domain: 'Languages & Compilers',
@@ -81,7 +138,7 @@ export const missions = [
   },
   {
     slug: 'html-tag-parser',
-    index: '03',
+    index: '04',
     callsign: 'NEST',
     title: 'HTML Tag Parser & Validator',
     domain: 'Data Structures',
@@ -116,7 +173,7 @@ export const missions = [
   },
   {
     slug: 'maze-solver',
-    index: '04',
+    index: '05',
     callsign: 'KRUSKAL',
     title: 'The Maze Project',
     domain: 'Algorithms',
@@ -152,7 +209,7 @@ export const missions = [
   },
   {
     slug: 'flight-deck',
-    index: '05',
+    index: '06',
     callsign: 'DECK',
     title: 'This Site',
     domain: 'Web',

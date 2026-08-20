@@ -12,6 +12,13 @@ export const profile = {
     since: '2025',
   },
   education: 'BS Computer Science, Sonoma State University',
+
+  // Board role at a California non-profit.
+  affiliation: {
+    role: 'Vice President',
+    org: 'Modern Faith Works',
+    url: 'https://modernfaithworks.org',
+  },
   email: 'joshualozano2002@gmail.com',
   github: 'https://github.com/joshualozano2002',
   linkedin: 'https://www.linkedin.com/in/joshua-lozano7/',

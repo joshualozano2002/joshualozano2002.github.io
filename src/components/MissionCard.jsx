@@ -16,7 +16,12 @@ export default function MissionCard({ m }) {
             {m.index} · {m.callsign}
           </span>
         </span>
-        <Label>{m.domain}</Label>
+        <span className="flex items-center gap-2">
+          {m.links?.length ? (
+            <span className="readout text-[9px] tracking-[0.18em] text-annunciator">LIVE</span>
+          ) : null}
+          <Label>{m.domain}</Label>
+        </span>
       </div>
 
       <div className="bg-void/60 px-4 py-4">

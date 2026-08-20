@@ -208,6 +208,69 @@ function TagStack() {
   )
 }
 
+/* ----------------------------------------------------------------- NAVE */
+/**
+ * The bilingual narration pipeline. Artifact text is machine-translated
+ * before synthesis; the fixed rosary prayers bypass translation entirely
+ * because canonical liturgical wording cannot be generated.
+ */
+function Narration() {
+  const box = (x, y, w, label, color) => (
+    <g key={`${x}-${y}`}>
+      <rect x={x} y={y} width={w} height="26" fill="#0d151d" stroke={color} strokeWidth="1.2" />
+      <text
+        x={x + w / 2}
+        y={y + 16.5}
+        textAnchor="middle"
+        fill="var(--color-ink)"
+        fontSize="8"
+        fontFamily={S.mono}
+      >
+        {label}
+      </text>
+    </g>
+  )
+  const amber = 'var(--color-amber)'
+  const cyan = 'var(--color-cyan)'
+
+  return (
+    <Frame
+      viewBox="0 0 344 200"
+      label="NARRATION PIPELINE"
+      aria="Two input paths feed one speech synthesis step: artifact text in English is machine-translated to Spanish first, while the fixed rosary prayers skip translation because their wording is canonical. Both then go to synthesis and the CDN."
+    >
+      <rect x="8" y="18" width="328" height="174" fill="#070c12" stroke={S.line} />
+
+      {box(18, 44, 74, 'artifact EN', cyan)}
+      {box(106, 44, 74, 'translate ES', cyan)}
+      {box(18, 130, 74, 'rosary ES', amber)}
+      {box(196, 87, 62, 'TTS', cyan)}
+      {box(272, 87, 52, 'CDN', cyan)}
+
+      <g fill="none" strokeWidth="1.2">
+        <path d="M92 57 L106 57" stroke={cyan} />
+        <path d="M100 52 L106 57 L100 62" stroke={cyan} />
+
+        <path d="M180 57 L188 57 Q196 57 196 66 L196 87" stroke={cyan} />
+        <path d="M191 81 L196 87 L201 81" stroke={cyan} />
+
+        <path d="M92 143 L188 143 Q196 143 196 134 L196 113" stroke={amber} />
+        <path d="M191 119 L196 113 L201 119" stroke={amber} />
+
+        <path d="M258 100 L272 100" stroke={cyan} />
+        <path d="M266 95 L272 100 L266 105" stroke={cyan} />
+      </g>
+
+      <text x="18" y="164" fill={S.dim} fontSize="6.8" fontFamily={S.mono} letterSpacing="0.6">
+        FIXED PRAYERS SKIP TRANSLATION
+      </text>
+      <text x="18" y="176" fill={S.dim} fontSize="6.8" fontFamily={S.mono} letterSpacing="0.6">
+        CANONICAL WORDING, NOT GENERATED
+      </text>
+    </Frame>
+  )
+}
+
 /* -------------------------------------------------------------- KRUSKAL */
 /**
  * Generated, not drawn: a seeded Kruskal run over a grid graph with Union-Find
@@ -373,6 +436,7 @@ function RouteGraph() {
 }
 
 const MAP = {
+  narration: Narration,
   detection: Detection,
   ast: Ast,
   stack: TagStack,

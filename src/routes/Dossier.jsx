@@ -14,7 +14,7 @@ export default function Dossier() {
     <>
       <Seo
         title="Dossier"
-        description={`Resume for ${profile.name} — ${profile.current.title} at ${profile.current.org}, former NASA SARP research intern, BS Computer Science from Sonoma State University. C/C++, Python, PyTorch, QA and technical program operations.`}
+        description={`Resume for ${profile.name} — ${profile.current.title} at ${profile.current.org}, Vice President of Modern Faith Works, former NASA SARP research intern, BS Computer Science from Sonoma State University. React Native, Node, Python, C/C++, PyTorch.`}
         path="/dossier"
       />
 
@@ -61,7 +61,20 @@ export default function Dossier() {
               {dossier.experience.map((e) => (
                 <article key={e.org}>
                   <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <h3 className="font-display text-lg font-semibold text-ink">{e.org}</h3>
+                    <h3 className="font-display text-lg font-semibold text-ink">
+                      {e.url ? (
+                        <a
+                          href={e.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-amber underline-offset-4 hover:underline"
+                        >
+                          {e.org} ↗
+                        </a>
+                      ) : (
+                        e.org
+                      )}
+                    </h3>
                     <span className="readout text-[11px] tracking-[0.15em] text-mute">
                       {e.place.toUpperCase()}
                     </span>

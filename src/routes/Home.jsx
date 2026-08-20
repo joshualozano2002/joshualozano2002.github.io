@@ -15,7 +15,7 @@ export default function Home() {
     <>
       <Seo
         title={`${profile.name} — Backend, Machine Learning & Technical Operations`}
-        description={`${profile.name} — ${profile.current.title} at ${profile.current.org}. Former NASA SARP research intern. Computer vision, a C-like language interpreter built from scratch, and the systems work underneath.`}
+        description={`${profile.name} — ${profile.current.title} at ${profile.current.org} and Vice President of Modern Faith Works, where he built a bilingual React Native church guide solo. Former NASA SARP research intern. Backend, machine learning, and systems work.`}
         path="/"
         jsonLd={personSchema()}
       />
@@ -47,6 +47,18 @@ export default function Home() {
             <p className="mt-3 readout text-xs tracking-[0.2em] text-dim">
               {profile.current.title.toUpperCase()}
               <span className="text-amber"> · {profile.current.org.toUpperCase()}</span>
+            </p>
+            <p className="mt-1.5 readout text-[11px] tracking-[0.15em] text-dim">
+              {profile.affiliation.role.toUpperCase()}
+              {' · '}
+              <a
+                href={profile.affiliation.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-amber underline-offset-4 hover:underline"
+              >
+                {profile.affiliation.org.toUpperCase()} ↗
+              </a>
             </p>
             <p className="mt-1.5 readout text-[11px] tracking-[0.15em] text-mute">
               {profile.education.toUpperCase()}
@@ -105,7 +117,7 @@ export default function Home() {
           <SectionHead
             index="Selected"
             title="Missions"
-            kicker="Detection pipelines, a language built from the character stream up, and the algorithms underneath."
+            kicker="A production bilingual app built solo, detection pipelines, and a language built from the character stream up."
           />
         </Reveal>
 

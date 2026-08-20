@@ -63,6 +63,23 @@ export default function Mission() {
           <p className="readout mt-6 text-[11px] tracking-[0.15em] text-mute">
             {m.course.toUpperCase()} · {m.year}
           </p>
+
+          {m.links?.length ? (
+            <div className="mt-7 flex flex-wrap gap-3">
+              {m.links.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  target={l.external ? '_blank' : undefined}
+                  rel={l.external ? 'noopener noreferrer' : undefined}
+                  className="rounded-xs px-5 py-2.5 text-sm font-semibold text-void transition-opacity hover:opacity-90"
+                  style={{ background: c }}
+                >
+                  {l.label} ↗
+                </a>
+              ))}
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -140,6 +157,13 @@ export default function Mission() {
             ))}
           </ul>
         </section>
+
+        {m.note ? (
+          <section className="border-t border-hairline py-10">
+            <Label className="mb-3">Record notes</Label>
+            <p className="max-w-2xl text-sm leading-relaxed text-mute text-pretty">{m.note}</p>
+          </section>
+        ) : null}
 
         {/* ------------------------------------------------------ PREV/NEXT */}
         <nav

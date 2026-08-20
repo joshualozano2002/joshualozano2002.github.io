@@ -57,6 +57,16 @@ export default function Footer() {
                 LinkedIn
               </a>
             </li>
+            <li>
+              <a
+                href={profile.affiliation.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-sm text-dim transition-colors hover:text-ink"
+              >
+                {profile.affiliation.org}
+              </a>
+            </li>
           </ul>
         </div>
       </div>
