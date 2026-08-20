@@ -20,7 +20,7 @@ export async function postbuild(dir, base = '/react-website-portfolio/') {
   ]
 
   const today = new Date().toISOString().slice(0, 10)
-  const url = (p) => `${ORIGIN}${base}${p}`.replace(/\/$/, '')
+  const url = (p) => `${ORIGIN}${base}${p}${p ? '/' : ''}`
 
   const sitemap = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
