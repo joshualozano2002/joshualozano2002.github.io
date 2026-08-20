@@ -1,0 +1,173 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   FLIGHT DECK — design tokens
+   Palette sampled from the SARP campaign photography:
+   cockpit shadow, PFD phosphor, window sky, safety-vest amber.
+   ============================================================ */
+@theme {
+  --color-void: #05080c;
+  --color-panel: #0a1017;
+  --color-raised: #121b26;
+  --color-hairline: #1e2a38;
+  --color-hairline-hot: #2c3d51;
+
+  --color-ink: #e2e9f0;
+  --color-dim: #8ea0b4;
+  --color-mute: #5a6b80;
+
+  --color-amber: #ff9d2e;
+  --color-cyan: #4fd6ea;
+  --color-sky: #4a8fd4;
+  --color-magenta: #e264d8;
+  --color-annunciator: #48e08a;
+
+  --font-display: 'Space Grotesk', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --ease-instrument: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--color-void);
+    color: var(--color-ink);
+    font-family: var(--font-display);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-amber) 32%, transparent);
+    color: #fff;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-amber);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+
+  /* Respect the user's motion preference everywhere. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Instrument bezel: recessed dark face with a lit top edge. */
+  .panel {
+    position: relative;
+    background:
+      linear-gradient(180deg, color-mix(in oklab, var(--color-raised) 92%, transparent), var(--color-panel));
+    border: 1px solid var(--color-hairline);
+    border-radius: 4px;
+  }
+  .panel::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in oklab, var(--color-cyan) 26%, transparent),
+      transparent
+    );
+    pointer-events: none;
+  }
+
+  /* Micro label — the stencilled text silkscreened onto a panel. */
+  .label {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-mute);
+  }
+
+  .readout {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+  }
+
+  /* Faint engineering grid, used behind hero + section breaks. */
+  .grid-bg {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--color-hairline) 55%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--color-hairline) 55%, transparent) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  .rule {
+    height: 1px;
+    background: linear-gradient(90deg, var(--color-hairline), transparent);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+  .text-pretty {
+    text-wrap: pretty;
+  }
+
+  /* Radial fade so the grid never reaches a hard edge. */
+  .mask-fade {
+    -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 40%, transparent 100%);
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 40%, #000 40%, transparent 100%);
+  }
+  .mask-b {
+    -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+    mask-image: linear-gradient(to bottom, #000 55%, transparent 100%);
+  }
+}
+
+/* Reveal states. Visible unless JS is present — see the head bootstrap. */
+[data-reveal] {
+  transition:
+    opacity 0.6s var(--ease-instrument),
+    transform 0.6s var(--ease-instrument);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.js [data-reveal='out'] {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+@keyframes sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes flicker {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}

@@ -1,23 +1,13 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
-/node_modules
-/.pnp
-.pnp.js
-
-# testing
-/coverage
-
-# production
-/build
-
-# misc
+node_modules
+dist
+.vite-react-ssg-temp
 .DS_Store
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+*.local
+.env
+.env.*
+!.env.example
 
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Previous create-react-app site, kept on disk during the rebuild.
+# Delete the folder once you are happy with the new one; the tracked files
+# are still recoverable from commit d2af8ac.
+legacy/
