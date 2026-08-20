@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { postbuild } from './scripts/postbuild.js'
 
-// BASE_PATH lets the same build target either a project page
-// (/react-website-portfolio/) or a user page / custom domain (/).
-const base = process.env.BASE_PATH ?? '/react-website-portfolio/'
+// BASE_PATH lets the same build target a user page or custom domain (/) or a
+// project page (/<repo>/).
+const base = process.env.BASE_PATH ?? '/'
 
 export default defineConfig({
   base,

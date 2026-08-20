@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "homepage": "https://joshualozano2002.github.io/react-website-portfolio",
+  "homepage": "https://joshualozano2002.github.io",
   "scripts": {
     "dev": "vite",
     "build": "vite-react-ssg build",

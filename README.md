@@ -1,4 +1,4 @@
-# Flight Deck — joshualozano.dev
+# Flight Deck — joshualozano2002.github.io
 
 Portfolio for Joshua Lozano, built as an aircraft instrument panel. The metaphor
 is not decoration: the design is drawn from photographs taken aboard NASA
