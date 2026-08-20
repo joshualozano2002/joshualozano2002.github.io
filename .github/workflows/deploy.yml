@@ -29,9 +29,17 @@ jobs:
 
       # BASE_PATH must match how the site is served. For a project page this is
       # /<repo>/. If you move to a user page or custom domain, set it to /.
+      # Project page (current). Serves at /<repo>/ on github.io.
       - run: npm run build
         env:
           BASE_PATH: /${{ github.event.repository.name }}/
+
+      # Custom domain: delete the step above, uncomment this one, and add
+      # public/CNAME containing the bare domain (no protocol, no slash).
+      # - run: npm run build
+      #   env:
+      #     BASE_PATH: /
+      #     VITE_SITE_ORIGIN: https://joshualozano.dev
 
       - uses: actions/configure-pages@v5
 

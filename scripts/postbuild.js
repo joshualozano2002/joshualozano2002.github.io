@@ -2,7 +2,7 @@ import { writeFile, copyFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { missions } from '../src/data/missions.js'
 
-const ORIGIN = 'https://joshualozano2002.github.io'
+const ORIGIN = process.env.VITE_SITE_ORIGIN ?? 'https://joshualozano2002.github.io'
 
 /**
  * Emitted after prerendering: a sitemap so crawlers can find every route,

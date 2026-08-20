@@ -35,7 +35,7 @@ export const dossier = {
       org: 'PA-AI',
       place: 'Remote',
       role: 'Operations & Technical Program Coordinator',
-      period: '2025 — Present',
+      period: '2026 — Present',
       current: true,
       summary:
         'Strategic intelligence platform built on the Psycho-Aesthetics® methodology, positioned as a human intelligence layer for AI.',
@@ -62,16 +62,6 @@ export const dossier = {
         'Used QGIS for geospatial analysis, mapping VOC concentrations over Long Beach and integrating environmental data for trend analysis.',
         'Collaborated with interdisciplinary teams of students, scientists, and NASA personnel to interpret and present data-driven results, and presented at a professional symposium.',
         'Operated atmospheric instrumentation and supported field deployments measuring air composition and other environmental variables.',
-      ],
-    },
-    {
-      org: 'Cattlemens Steakhouse',
-      place: 'Petaluma, CA',
-      role: 'Food Server',
-      period: 'September 2022 — December 2024',
-      bullets: [
-        'Managed multiple concurrent tables in a fast-paced, high-pressure service environment, prioritizing by urgency.',
-        'Coordinated with a large floor and kitchen team where clear, fast communication was the difference between a good and a bad service.',
       ],
     },
   ],

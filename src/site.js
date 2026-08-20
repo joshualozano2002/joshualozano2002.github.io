@@ -1,6 +1,8 @@
 // Absolute origin + path the site is served from. Used for canonical URLs,
 // Open Graph tags, sitemap, and JSON-LD — all of which need absolute URLs.
-export const SITE_ORIGIN = 'https://joshualozano2002.github.io'
+// Set VITE_SITE_ORIGIN in the deploy workflow when moving to a custom domain.
+export const SITE_ORIGIN =
+  import.meta.env.VITE_SITE_ORIGIN ?? 'https://joshualozano2002.github.io'
 export const BASE = import.meta.env.BASE_URL // '/react-website-portfolio/' or '/'
 
 /** Join the base path onto a relative asset/route path. */

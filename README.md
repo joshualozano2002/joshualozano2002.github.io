@@ -47,13 +47,46 @@ npm run preview  # serve the build locally
 ## Deploying
 
 Pushing to `master` runs `.github/workflows/deploy.yml`, which builds and
-publishes to GitHub Pages. Enable it once under **Settings → Pages → Source →
-GitHub Actions**.
+publishes to GitHub Pages. The Pages source must be set to **GitHub Actions**
+under Settings -> Pages; if it is set to a branch instead, the `deploy` job
+fails before running a step while `build` still passes.
 
-`BASE_PATH` controls the path the site is served from. The workflow sets it to
-`/<repo-name>/` for a project page. If you move to a user page
-(`joshualozano2002.github.io`) or a custom domain, set it to `/` and update
-`SITE_ORIGIN` in `src/site.js`.
+### Moving to a custom domain
+
+1. Buy the domain and point DNS at GitHub Pages.
+
+   For an apex domain (`joshualozano.dev`), four `A` records and four `AAAA`:
+
+   ```
+   A     @   185.199.108.153
+   A     @   185.199.109.153
+   A     @   185.199.110.153
+   A     @   185.199.111.153
+   AAAA  @   2606:50c0:8000::153
+   AAAA  @   2606:50c0:8001::153
+   AAAA  @   2606:50c0:8002::153
+   AAAA  @   2606:50c0:8003::153
+   CNAME www joshualozano2002.github.io.
+   ```
+
+   On Cloudflare, set these records to **DNS only** (grey cloud). Proxying
+   them breaks GitHub's certificate issuance.
+
+2. Add `public/CNAME` containing just the bare domain:
+
+   ```
+   joshualozano.dev
+   ```
+
+3. In `.github/workflows/deploy.yml`, swap the build step for the commented
+   custom-domain one: `BASE_PATH: /` and
+   `VITE_SITE_ORIGIN: https://joshualozano.dev`.
+
+4. Push, then tick **Enforce HTTPS** in Settings -> Pages once the certificate
+   is issued (usually a few minutes, occasionally up to an hour).
+
+Canonical URLs, Open Graph tags and the sitemap all read `VITE_SITE_ORIGIN`,
+so they follow automatically. Nothing else needs editing.
 
 ## Where the content lives
 
