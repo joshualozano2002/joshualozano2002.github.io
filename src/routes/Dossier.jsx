@@ -29,6 +29,18 @@ export default function Dossier() {
             {profile.current.title.toUpperCase()}
             <span className="text-amber"> · {profile.current.org.toUpperCase()}</span>
           </p>
+          <p className="readout mt-1.5 text-[11px] tracking-[0.15em] text-dim">
+            {profile.affiliation.role.toUpperCase()}
+            {' · '}
+            <a
+              href={profile.affiliation.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-amber underline-offset-4 hover:underline"
+            >
+              {profile.affiliation.org.toUpperCase()} ↗
+            </a>
+          </p>
           <p className="readout mt-1.5 text-[11px] tracking-[0.15em] text-mute">
             {profile.education.toUpperCase()} · {profile.location.toUpperCase()}
           </p>
