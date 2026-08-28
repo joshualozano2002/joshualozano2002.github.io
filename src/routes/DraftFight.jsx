@@ -7,10 +7,37 @@ import { MAX_MANAGERS, MIN_MANAGERS, fightHash, readHash } from '../draftfight/c
 import { buildFighters } from '../draftfight/roster'
 import { simulate } from '../draftfight/sim'
 import { newSeed } from '../draftfight/rng'
+import { sharedNow, syncClock } from '../draftfight/clock'
 import { primeAudio, sfxBell } from '../draftfight/sound'
 
 const SIZES = Array.from({ length: MAX_MANAGERS - MIN_MANAGERS + 1 }, (_, i) => MIN_MANAGERS + i)
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+const pad2 = (n) => String(n).padStart(2, '0')
+
+/** hh:mm:ss (or mm:ss) until the bell. */
+const countdownText = (ms) => {
+  const t = Math.max(0, Math.ceil(ms / 1000))
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const sec = t % 60
+  return h > 0 ? `${h}:${pad2(m)}:${pad2(sec)}` : `${pad2(m)}:${pad2(sec)}`
+}
+
+/** The bell time in the viewer's own words: "7:30 PM", "Sat 7:30 PM"… */
+const bellText = (startAt) => {
+  const d = new Date(startAt)
+  const sameDay = new Date().toDateString() === d.toDateString()
+  const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return sameDay ? `today at ${time}` : `${d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })} at ${time}`
+}
+
+/** datetime-local value for a sensible default bell: ~15 min out, on a :05. */
+const defaultBellValue = () => {
+  const d = new Date(sharedNow() + 15 * 60000)
+  d.setSeconds(0, 0)
+  d.setMinutes(Math.ceil(d.getMinutes() / 5) * 5)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}
 
 /** Copy that works without the async clipboard API (older Safari, http hosts). */
 function copyText(text) {
@@ -74,6 +101,8 @@ function Setup({ onStart }) {
   const [league, setLeague] = useState('')
   const [size, setSize] = useState(12)
   const [names, setNames] = useState(() => Array(12).fill(''))
+  const [mode, setMode] = useState('live')
+  const [bell, setBell] = useState(defaultBellValue)
   const [error, setError] = useState('')
 
   const resize = (next) => {
@@ -91,8 +120,20 @@ function Setup({ onStart }) {
       setError(`Manager ${missing + 1} still needs a name — every seat has to be filled.`)
       return
     }
+    let startAt = 0
+    if (mode === 'live') {
+      startAt = new Date(bell).getTime()
+      if (!Number.isFinite(startAt)) {
+        setError('Pick a time for the bell.')
+        return
+      }
+      if (startAt - sharedNow() < 60_000) {
+        setError('The bell needs to be at least a minute out, so the league has time to tune in.')
+        return
+      }
+    }
     setError('')
-    onStart({ league: league.trim() || 'The League', managers, seed: newSeed() })
+    onStart({ league: league.trim() || 'The League', managers, seed: newSeed(), startAt })
   }
 
   return (
@@ -162,6 +203,45 @@ function Setup({ onStart }) {
         ))}
       </div>
 
+      <div className="mt-8 mb-2 flex items-center gap-2.5">
+        <Lamp color="annunciator" />
+        <Label style={{ color: 'var(--color-annunciator)' }}>Step 04 · Bell time</Label>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {[
+          ['live', 'LIVE EVENT'],
+          ['demand', 'ON DEMAND'],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            onClick={() => setMode(key)}
+            aria-pressed={mode === key}
+            className={`readout rounded-xs border px-4 py-2.5 text-[11px] tracking-[0.16em] transition-colors ${
+              mode === key
+                ? 'border-amber bg-amber/10 text-amber'
+                : 'border-hairline text-dim hover:border-hairline-hot hover:text-ink'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        {mode === 'live' ? (
+          <input
+            type="datetime-local"
+            value={bell}
+            onChange={(e) => setBell(e.target.value)}
+            aria-label="Bell time"
+            className="readout rounded-xs border border-hairline bg-void px-3 py-2 text-xs text-ink outline-none [color-scheme:dark] focus:border-amber"
+          />
+        ) : null}
+      </div>
+      <p className="mt-3 text-xs text-mute">
+        {mode === 'live'
+          ? 'The bell rings for the whole league at once. Anyone opening the link early gets a countdown, nobody can watch ahead — you included — and anyone tuning in late joins the fight already in progress.'
+          : 'No schedule — each person watches the same fight whenever they open the link.'}
+      </p>
+
       {error ? (
         <p role="alert" className="mt-5 text-sm text-[#ff8a7a]">
           {error}
@@ -172,7 +252,7 @@ function Setup({ onStart }) {
         type="submit"
         className="mt-8 w-full rounded-xs bg-amber px-5 py-3.5 font-display text-sm font-bold tracking-[0.18em] text-void uppercase transition-opacity hover:opacity-90"
       >
-        Build the fight
+        {mode === 'live' ? 'Schedule the fight' : 'Build the fight'}
       </button>
     </form>
   )
@@ -237,6 +317,13 @@ export default function DraftFight() {
   const [playing, setPlaying] = useState(false)
   const [runKey, setRunKey] = useState(0)
   const [href, setHref] = useState('')
+  const [replay, setReplay] = useState(false) // aired live fight, watched again
+  const [, setTick] = useState(0) // re-render pulse for the countdown
+
+  // One shared clock for everyone watching a scheduled fight.
+  useEffect(() => {
+    syncClock()
+  }, [])
 
   // An invite link carries the whole fight in its fragment.
   useEffect(() => {
@@ -246,6 +333,7 @@ export default function DraftFight() {
         setSpec(parsed)
         setPhase('lobby')
         setRevealed({})
+        setReplay(false)
         setHud({ secs: 0, alive: parsed.managers.length })
         setHref(window.location.href)
       } else {
@@ -267,12 +355,15 @@ export default function DraftFight() {
     [spec],
   )
 
+  const isLive = Boolean(spec?.startAt) && !replay
+
   const publish = useCallback((next) => {
     const hash = fightHash(next)
     window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}${hash}`)
     setHref(window.location.href)
     setSpec(next)
     setRevealed({})
+    setReplay(false)
     setPhase('lobby')
     setPlaying(false)
     setSpeed(1)
@@ -282,6 +373,7 @@ export default function DraftFight() {
   const start = () => {
     primeAudio()
     if (sound) sfxBell()
+    if (spec.startAt) setReplay(true) // the event aired; this showing is a replay
     setRevealed({})
     setHud({ secs: 0, alive: spec.managers.length })
     setRunKey((k) => k + 1)
@@ -300,6 +392,45 @@ export default function DraftFight() {
   }, [fight])
 
   const onClock = useCallback((secs, alive) => setHud({ secs, alive }), [])
+
+  /** Broadcast position: ms since the bell, on the skew-corrected clock. */
+  const liveClock = useCallback(() => sharedNow() - spec.startAt, [spec])
+
+  // Opening a scheduled link: jump to wherever the broadcast is right now —
+  // countdown lobby, mid-fight, or straight to the result if it already aired.
+  useEffect(() => {
+    if (!spec?.startAt || !fight || replay) return
+    const sinceBell = sharedNow() - spec.startAt
+    if (sinceBell > fight.durationMs + 2000) {
+      const all = {}
+      fight.order.forEach((id, i) => {
+        all[i + 1] = id
+      })
+      setRevealed(all)
+      setPlaying(false)
+      setPhase('done')
+    } else if (sinceBell > -8000) {
+      setPhase('live')
+    }
+  }, [spec, fight, replay])
+
+  // Countdown ticker; flips the lobby into the arena eight seconds out.
+  useEffect(() => {
+    if (!spec?.startAt || replay || phase === 'done') return
+    const id = setInterval(() => {
+      setTick((t) => t + 1)
+      if (spec.startAt - sharedNow() <= 8000) {
+        setPhase((p) => (p === 'lobby' ? 'live' : p))
+      }
+    }, 250)
+    return () => clearInterval(id)
+  }, [spec, replay, phase])
+
+  // Ring the bell audibly when a live fight starts itself.
+  useEffect(() => {
+    if (phase === 'live' && isLive && sound) sfxBell()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   // Each stage is a different page, but the router only scrolls on a real
   // route change — without this you submit the roster and land halfway down
@@ -371,9 +502,9 @@ export default function DraftFight() {
                     {spec.league}
                   </h1>
                   <p className="mt-5 max-w-2xl text-base leading-relaxed text-dim text-pretty">
-                    {n} managers, one ring, {n} draft slots. Send the link below to the league —
-                    every person who opens it sees this exact fight, so nobody has to take your word
-                    for the result.
+                    {isLive
+                      ? `${n} managers, one ring, one broadcast. Send the link below now — everyone who opens it gets this countdown, and the fight starts for the whole league at the same moment.`
+                      : `${n} managers, one ring, ${n} draft slots. Send the link below to the league — every person who opens it sees this exact fight, so nobody has to take your word for the result.`}
                   </p>
 
                   <div className="panel mt-8 p-5">
@@ -424,24 +555,46 @@ export default function DraftFight() {
                     </ul>
                   </div>
 
+                  {isLive ? (
+                    <div className="panel mt-8 p-6 text-center">
+                      <div className="mb-3 flex items-center justify-center gap-2.5">
+                        <Lamp color="magenta" />
+                        <Label className="text-magenta">Live event · Bell {bellText(spec.startAt)}</Label>
+                      </div>
+                      <p className="readout text-5xl font-bold tracking-tight text-amber sm:text-6xl">
+                        {countdownText(spec.startAt - sharedNow())}
+                      </p>
+                      <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-mute">
+                        The fight starts here, by itself, for everyone at once. Nobody can watch it
+                        early — you included. Anyone who tunes in late joins the fight already in
+                        progress.
+                      </p>
+                    </div>
+                  ) : null}
+
                   <div className="mt-8 flex flex-wrap items-center gap-3">
+                    {!isLive ? (
+                      <button
+                        type="button"
+                        onClick={start}
+                        className="rounded-xs bg-amber px-6 py-3.5 font-display text-sm font-bold tracking-[0.18em] text-void uppercase transition-opacity hover:opacity-90"
+                      >
+                        Ring the bell
+                      </button>
+                    ) : null}
                     <button
                       type="button"
-                      onClick={start}
-                      className="rounded-xs bg-amber px-6 py-3.5 font-display text-sm font-bold tracking-[0.18em] text-void uppercase transition-opacity hover:opacity-90"
-                    >
-                      Ring the bell
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSound((s) => !s)}
+                      onClick={() => {
+                        primeAudio()
+                        setSound((s) => !s)
+                      }}
                       className="readout rounded-xs border border-hairline px-4 py-3 text-[11px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
                     >
                       SOUND {sound ? 'ON' : 'OFF'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => publish({ ...spec, seed: newSeed() })}
+                      onClick={() => publish({ ...spec, seed: newSeed(), startAt: spec.startAt })}
                       className="readout rounded-xs border border-hairline px-4 py-3 text-[11px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
                     >
                       RE-ROLL FIGHT
@@ -464,7 +617,27 @@ export default function DraftFight() {
                           {phase === 'done' ? 'Fight over' : `${hud.alive} standing`}
                         </span>
                       </div>
-                      {phase === 'live' ? (
+                      {phase === 'live' && isLive ? (
+                        <div className="flex items-center gap-2">
+                          <span className="flex items-center gap-2 rounded-xs border border-[#ff5a4d]/60 px-3 py-1.5">
+                            <Lamp color="magenta" className="animate-pulse" />
+                            <span className="readout text-[10px] tracking-[0.2em] text-[#ff8a7a]">
+                              LIVE
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              primeAudio()
+                              setSound((v) => !v)
+                            }}
+                            className="readout rounded-xs border border-hairline px-3 py-1.5 text-[10px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
+                          >
+                            {sound ? 'SOUND ON' : 'SOUND OFF'}
+                          </button>
+                        </div>
+                      ) : null}
+                      {phase === 'live' && !isLive ? (
                         <div className="flex items-center gap-2">
                           <button
                             type="button"
@@ -514,6 +687,7 @@ export default function DraftFight() {
                         speed={speed}
                         sound={sound}
                         runKey={runKey}
+                        clock={isLive ? liveClock : undefined}
                         onElim={onElim}
                         onClock={onClock}
                         onEnd={onEnd}
@@ -541,13 +715,13 @@ export default function DraftFight() {
                             onClick={start}
                             className="readout rounded-xs border border-hairline-hot px-3 py-2 text-[11px] tracking-[0.16em] text-ink hover:border-amber hover:text-amber"
                           >
-                            WATCH AGAIN
+                            {spec.startAt ? 'WATCH THE REPLAY' : 'WATCH AGAIN'}
                           </button>
                         </div>
                         <p className="mt-5 text-xs text-mute">
-                          This link always replays this fight. Anyone who thinks you fixed it can
-                          open it themselves and watch the same {n - 1} knockouts land in the same
-                          order.
+                          {spec.startAt
+                            ? `This one aired live ${bellText(spec.startAt)} — the whole league saw the same ${n - 1} knockouts at the same moment, and the link replays it for anyone who missed the broadcast.`
+                            : `This link always replays this fight. Anyone who thinks you fixed it can open it themselves and watch the same ${n - 1} knockouts land in the same order.`}
                         </p>
                       </div>
                     )}

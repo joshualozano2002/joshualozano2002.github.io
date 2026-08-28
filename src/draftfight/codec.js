@@ -25,9 +25,16 @@ const fromBase64Url = (str) => {
   return bytes
 }
 
-/** Compact wire form: [version, league, seed, ...managers]. */
-export function encodeFight({ league, seed, managers }) {
-  const payload = [1, league, seed, ...managers]
+/**
+ * Compact wire form: [2, league, seed, startAt, ...managers].
+ *
+ * startAt is the bell time in epoch ms, or 0 for a watch-on-demand fight.
+ * A scheduled fight is a live broadcast with no server: every device counts
+ * down to the same wall-clock moment and runs the same deterministic playback,
+ * so the whole league watches the same hit land at the same time.
+ */
+export function encodeFight({ league, seed, managers, startAt = 0 }) {
+  const payload = [2, league, seed, startAt || 0, ...managers]
   return toBase64Url(new TextEncoder().encode(JSON.stringify(payload)))
 }
 
@@ -35,12 +42,23 @@ export function encodeFight({ league, seed, managers }) {
 export function decodeFight(token) {
   try {
     const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(token)))
-    if (!Array.isArray(payload) || payload[0] !== 1) return null
-    const [, league, seed, ...managers] = payload
+    if (!Array.isArray(payload)) return null
+    let league, seed, startAt, managers
+    if (payload[0] === 1) {
+      // First shipped format, before scheduled fights existed.
+      ;[, league, seed, ...managers] = payload
+      startAt = 0
+    } else if (payload[0] === 2) {
+      ;[, league, seed, startAt, ...managers] = payload
+      if (!Number.isFinite(startAt) || startAt < 0 || startAt > 1e13) return null
+      startAt = Math.floor(startAt)
+    } else {
+      return null
+    }
     if (typeof seed !== 'string' || !seed) return null
     const names = managers.map((m) => String(m).trim()).filter(Boolean)
     if (names.length < MIN_MANAGERS || names.length > MAX_MANAGERS) return null
-    return { league: String(league ?? '').trim() || 'The League', seed, managers: names }
+    return { league: String(league ?? '').trim() || 'The League', seed, startAt, managers: names }
   } catch {
     return null
   }

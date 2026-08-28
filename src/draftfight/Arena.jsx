@@ -55,6 +55,7 @@ export default function Arena({
   speed = 1,
   sound = false,
   runKey = 0,
+  clock, // live broadcast: () => ms since the bell; overrides playing/speed
   onElim,
   onClock,
   onEnd,
@@ -66,11 +67,13 @@ export default function Arena({
   const playingRef = useRef(playing)
   const speedRef = useRef(speed)
   const soundRef = useRef(sound)
+  const clockRef = useRef(clock)
   const cbRef = useRef({ onElim, onClock, onEnd })
 
   playingRef.current = playing
   speedRef.current = speed
   soundRef.current = sound
+  clockRef.current = clock
   cbRef.current = { onElim, onClock, onEnd }
 
   useEffect(() => {
@@ -176,7 +179,12 @@ export default function Arena({
       const dt = run.last ? Math.max(0, Math.min(now - run.last, 120)) : 0
       run.last = now
 
-      if (playingRef.current && !run.ended) {
+      if (clockRef.current) {
+        // Broadcast: playback position is a property of the wall clock, not of
+        // rendered frames. Background the tab and come back and you are at the
+        // live moment, exactly like a television.
+        run.elapsed = clockRef.current()
+      } else if (playingRef.current && !run.ended) {
         run.elapsed += dt * speedRef.current
       }
 
@@ -188,30 +196,38 @@ export default function Arena({
 
       // Fire every event the clock has passed, in order, even at 4x speed.
       if (run.elapsed >= 0) {
+        // A late joiner (or a tab coming back from the background) sweeps past
+        // a backlog of events in one frame. The bookkeeping always runs; the
+        // fireworks only run for events that just happened, so joining a live
+        // fight at minute one doesn't detonate forty punches at once.
         while (run.hit < hits.length && hits[run.hit].t <= t0) {
           const h = hits[run.hit++]
           run.lastAtk[h.a] = h.t
           run.lastDef[h.d] = h.t
           run.faceX[h.a] = h.x
           run.faceX[h.d] = h.x
-          run.sparks.push({ x: h.x, y: h.y, life: 0, p: Math.min(h.p, 1.4) })
-          if (h.p > 0.85)
-            run.pows.push({
-              x: h.x,
-              y: h.y,
-              life: 0,
-              txt: POWS[run.hit % POWS.length],
-              rot: (Math.random() - 0.5) * 0.4,
-            })
-          run.shake = Math.min(run.shake + 2 + h.p * 3.5, 15)
-          if (soundRef.current) sfxHit(h.p)
+          if (t0 - h.t <= 8) {
+            run.sparks.push({ x: h.x, y: h.y, life: 0, p: Math.min(h.p, 1.4) })
+            if (h.p > 0.85)
+              run.pows.push({
+                x: h.x,
+                y: h.y,
+                life: 0,
+                txt: POWS[run.hit % POWS.length],
+                rot: (Math.random() - 0.5) * 0.4,
+              })
+            run.shake = Math.min(run.shake + 2 + h.p * 3.5, 15)
+            if (soundRef.current) sfxHit(h.p)
+          }
         }
         while (run.elim < elims.length && elims[run.elim].t <= t0) {
           const e = elims[run.elim++]
-          run.banner = { at: now, e }
-          run.shake = 17
-          if (soundRef.current) sfxElim()
           cbRef.current.onElim?.(e)
+          if (t0 - e.t <= 45) {
+            run.banner = { at: now, e }
+            run.shake = 17
+            if (soundRef.current) sfxElim()
+          }
         }
       }
 
@@ -580,12 +596,19 @@ export default function Arena({
         ctx.globalAlpha = 1
       }
 
-      // Pre-roll overlay.
+      // Pre-roll overlay: counting down to the bell, then the bell.
       if (run.elapsed < 0) {
         ctx.fillStyle = 'rgba(4,6,10,0.55)'
         ctx.fillRect(0, 0, 1000, VIEW_H)
-        const late = run.elapsed > -650
-        outlined(late ? 'FIGHT!' : 'READY…', 500, 340, late ? 84 : 56, late ? '#ff9d2e' : '#8ea0b4')
+        const secLeft = Math.ceil(-run.elapsed / 1000)
+        if (secLeft <= 9) {
+          outlined(String(secLeft), 500, 330, 96, secLeft <= 3 ? '#ff9d2e' : '#e2e9f0')
+          if (clockRef.current) outlined('THE BELL IS ABOUT TO RING', 500, 410, 22, '#8ea0b4')
+        } else {
+          outlined('READY…', 500, 340, 56, '#8ea0b4')
+        }
+      } else if (run.elapsed < 700) {
+        outlined('FIGHT!', 500, 340, 84, '#ff9d2e')
       }
 
       // Screen dressing, in device pixels so the lines stay crisp.
