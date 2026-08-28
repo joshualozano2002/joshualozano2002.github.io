@@ -36,7 +36,7 @@ const HI = RING_MAX - BODY - 4
 
 /** Damage scales up over time so no fight can stall out in a corner. */
 const ramp = (t) => {
-  const over = t - TICK_HZ * 58
+  const over = t - TICK_HZ * 72
   if (over <= 0) return 1
   const r = 1 + over / (TICK_HZ * 30)
   return r > 4 ? 4 : r
@@ -183,7 +183,7 @@ export function simulate(seed, n) {
 
         cool[i] -= 1
         if (dist < REACH && cool[i] <= 0) {
-          const dmg = (1.05 + rng() * 1.85) * power[i] * dmgMul
+          const dmg = (0.85 + rng() * 1.5) * power[i] * dmgMul
           hp[tg] -= dmg
           cool[i] = 11 + rng() * 16
           const kb = dist > 0.001 ? 3.6 * power[i] / dist : 0
