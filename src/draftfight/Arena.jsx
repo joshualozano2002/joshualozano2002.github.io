@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
-import { drawChair, drawShadow, drawWrestler } from './sprite.js'
+import { drawChair, drawRef, drawShadow, drawWrestler } from './sprite.js'
 import { sfxBell, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, sfxWin } from './sound.js'
 
 /**
@@ -21,6 +21,10 @@ import { sfxBell, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, 
 const TAU = Math.PI * 2
 const CX = 500
 const BANNER_MS = 2200
+const REPLAY_HOLD = 3000 // celebration before the slow-mo
+const REPLAY_PRE = 75 // ticks of runway before the deciding blow
+const REPLAY_POST = 25
+const REPLAY_RATE = 0.4
 const INTRO_OPEN = 2600 // the tonight-card before the first entrance
 const INTRO_PER = 1800 // one wrestler's walk
 
@@ -64,6 +68,7 @@ export default function Arena({
   runKey = 0,
   clock, // live broadcast: () => ms since the bell; overrides playing/speed
   league = '',
+  champ = -1, // roster index defending Pick 1, -1 for nobody
   ctlRef, // page-facing controls: { skipIntro }
   onElim,
   onClock,
@@ -112,6 +117,12 @@ export default function Arena({
 
     const { n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, objects, winner } = fight
     const introMs = introDurationMs(n)
+    const durMs = fight.durationMs
+    const lastElim = elims[elims.length - 1]
+    const replayStart = Math.max(0, (lastElim?.t ?? 0) - REPLAY_PRE)
+    const replayTicks = (lastElim?.t ?? 0) + REPLAY_POST - replayStart
+    const replayLenMs = (replayTicks / TICK_HZ / REPLAY_RATE) * 1000
+    const epilogueMs = lastElim ? REPLAY_HOLD + replayLenMs : 0
     const run = {
       elapsed: -(introMs + 1600), // pre-roll countdown, then the entrances
       last: 0,
@@ -225,7 +236,16 @@ export default function Arena({
         run.elapsed += dt * speedRef.current
       }
 
-      const tf = Math.max(0, Math.min((run.elapsed / 1000) * TICK_HZ, ticks - 1))
+      // The epilogue: hold the celebration, then show the deciding blow again
+      // in slow motion. Driven by elapsed, so a live audience sees it together.
+      const pastEnd = Math.max(0, run.elapsed - durMs)
+      const inReplay = lastElim && pastEnd > REPLAY_HOLD && pastEnd <= REPLAY_HOLD + replayLenMs
+      let tf
+      if (inReplay) {
+        tf = Math.min(replayStart + ((pastEnd - REPLAY_HOLD) / 1000) * TICK_HZ * REPLAY_RATE, ticks - 1)
+      } else {
+        tf = Math.max(0, Math.min((run.elapsed / 1000) * TICK_HZ, ticks - 1))
+      }
       const t0 = Math.floor(tf)
       const t1 = Math.min(t0 + 1, ticks - 1)
       const a = tf - t0
@@ -306,6 +326,7 @@ export default function Arena({
             run.shake = 17
             if (soundRef.current) sfxElim()
             const loser = fighters[e.id].name
+            if (fighters[e.id].champ) say(`THE CHAMP IS GONE — ${loser} loses Pick 1!`)
             if (e.by >= 0) {
               if (e.by === run.koBy && e.t - run.koAt < TICK_HZ * 20) run.koStreak++
               else run.koStreak = 1
@@ -324,8 +345,29 @@ export default function Arena({
         }
       }
 
+      // Slow-mo FX: re-fire the sparks of the window as the clock passes them.
+      if (inReplay) {
+        if (run.replayPtr === undefined || pastEnd - REPLAY_HOLD < 80) {
+          run.replayPtr = hits.findIndex((h) => h.t >= replayStart)
+          if (run.replayPtr < 0) run.replayPtr = hits.length
+          run.replayDecided = false
+        }
+        while (run.replayPtr < hits.length && hits[run.replayPtr].t <= t0) {
+          const h = hits[run.replayPtr++]
+          run.sparks.push({ x: h.x, y: h.y, life: 0, p: Math.min(h.p, 1.4) })
+          if (soundRef.current) sfxHit(h.p * 0.7)
+        }
+        if (!run.replayDecided && t0 >= lastElim.t) {
+          run.replayDecided = true
+          run.shake = 16
+          if (soundRef.current) sfxElim()
+        }
+      }
+
       let aliveNow = 0
       for (let i = 0; i < n; i++) if (at(state, t0, i) === 2) aliveNow++
+      // During the epilogue the HUD keeps reporting the settled fight.
+      const aliveHud = run.elapsed > durMs && !inReplay ? (n > 1 ? 1 : n) : aliveNow
 
       // Booth calls on the shape of the fight.
       if (run.elapsed >= 0) {
@@ -373,18 +415,21 @@ export default function Arena({
         run.prevAlive = aliveNow
       }
 
-      const secs = run.elapsed / 1000
+      const secs = Math.min(run.elapsed, durMs) / 1000
       if (run.clockAt < -1e8 || Math.abs(secs - run.clockAt) > 0.2 || aliveNow <= 1) {
         run.clockAt = secs
-        cbRef.current.onClock?.(secs, aliveNow)
+        cbRef.current.onClock?.(secs, aliveHud)
       }
 
-      if (!run.ended && tf >= ticks - 1) {
-        run.ended = true
+      if (!run.won && run.elapsed >= durMs) {
+        run.won = true
         if (soundRef.current) sfxWin()
+      }
+      if (!run.ended && run.elapsed >= durMs + epilogueMs) {
+        run.ended = true
         cbRef.current.onEnd?.()
       }
-      const finished = aliveNow <= 1
+      const finished = aliveNow <= 1 && !inReplay
 
       // ---- paint (world coords: 1000 wide, VIEW_H tall) ----
       const s = size / 1000
@@ -555,6 +600,10 @@ export default function Arena({
       const introT = run.elapsed + introMs // 0..introMs while the entrances run
       const inIntro = run.elapsed < 0 && introT >= 0
       const entranceIdx = inIntro ? Math.floor((introT - INTRO_OPEN) / INTRO_PER) : n
+      // The defending champ walks last, as is right and proper.
+      const entOrder = []
+      for (let i = 0; i < n; i++) if (i !== champ) entOrder.push(i)
+      if (champ >= 0 && champ < n) entOrder.push(champ)
 
       // Split: in the ring (drawn between rope layers) vs out/flying (in front).
       const inRing = []
@@ -562,14 +611,15 @@ export default function Arena({
       if (inIntro) {
         // Pre-show cast: everyone who has entered stands on their mark; the
         // current wrestler walks the aisle from the tunnel to their spot.
-        for (let i = 0; i <= entranceIdx && i < n; i++) {
+        for (let k = 0; k <= entranceIdx && k < n; k++) {
+          const i = entOrder[k]
           const sx = at(px, 0, i)
           const sy = at(py, 0, i)
-          if (i < entranceIdx) {
+          if (k < entranceIdx) {
             inRing.push({ i, st: 2, wx: sx, wy: sy, intro: 'set' })
             continue
           }
-          const wp = Math.min(1, (introT - INTRO_OPEN - i * INTRO_PER) / (INTRO_PER * 0.8))
+          const wp = Math.min(1, (introT - INTRO_OPEN - k * INTRO_PER) / (INTRO_PER * 0.8))
           const e = wp * wp * (3 - 2 * wp)
           const wx = 500 + (sx - 500) * e
           const wy = 30 + (sy - 30) * e
@@ -590,9 +640,14 @@ export default function Arena({
       // Entrance stings + booth intro lines, once per wrestler.
       if (inIntro && entranceIdx >= 0 && entranceIdx < n && entranceIdx !== run.introIdx) {
         run.introIdx = entranceIdx
-        const f = fighters[entranceIdx]
-        say(`Here comes ${f.name} — ${f.callsign}!`)
-        if (soundRef.current) sfxEntrance(entranceIdx)
+        const who = entOrder[entranceIdx]
+        const f = fighters[who]
+        say(
+          f.champ
+            ? `And finally — defending Pick 1 — ${f.name}, ${f.callsign}!`
+            : `Here comes ${f.name} — ${f.callsign}!`,
+        )
+        if (soundRef.current) sfxEntrance(entranceIdx + (f.champ ? 5 : 0))
       }
 
       const drawOne = ({ i, st, wx, wy, intro }) => {
@@ -679,8 +734,31 @@ export default function Arena({
         ctx.save()
         ctx.translate(X, Y + 20 * d)
         drawShadow(ctx, 17 * d, 5.5 * d)
-        drawWrestler(ctx, f.pal, pose, animFrame + i, run.facing[i], u)
+        drawWrestler(
+          ctx,
+          isWinner ? { ...f.pal, belt: true } : f.pal,
+          pose,
+          animFrame + i,
+          run.facing[i],
+          u,
+        )
         ctx.restore()
+
+        if (isWinner && lastElim) {
+          // The referee makes it official.
+          const refP = Math.min(1, Math.max(0, (run.elapsed - (lastElim.t / TICK_HZ) * 1000 - 900) / 1500))
+          if (refP > 0) {
+            const e = refP * refP * (3 - 2 * refP)
+            const rx = 840 + (wx + 34 - 840) * e
+            const ry = 880 + (wy + 6 - 880) * e
+            const [RX, RY, RD] = proj(rx, ry)
+            ctx.save()
+            ctx.translate(RX, RY + 20 * RD)
+            drawShadow(ctx, 13 * RD, 4.5 * RD)
+            drawRef(ctx, refP >= 1 ? 'raise' : 'walk', animFrame, wx + 34 >= rx ? 1 : -1, 3.1 * RD)
+            ctx.restore()
+          }
+        }
 
         // Hit flash on whoever just took one.
         if (t0 - run.lastDef[i] < 3 && !reduced) {
@@ -826,7 +904,7 @@ export default function Arena({
       ctx.restore() // end FINAL TWO camera
 
       // Confetti for the champion.
-      if (finished && !reduced) {
+      if ((finished || pastEnd > 0) && !reduced) {
         if (run.confetti.length < 130)
           for (let k = 0; k < 3; k++)
             run.confetti.push({
@@ -911,8 +989,34 @@ export default function Arena({
         ctx.globalAlpha = 1
       }
 
+      // Slow-motion dressing for the deciding blow.
+      if (inReplay) {
+        ctx.fillStyle = 'rgba(2,3,6,0.92)'
+        ctx.fillRect(0, 0, 1000, 64)
+        ctx.fillRect(0, VIEW_H - 64, 1000, 64)
+        const blink = Math.floor(now / 450) % 2 === 0
+        if (blink) {
+          ctx.beginPath()
+          ctx.arc(870, 32, 7, 0, TAU)
+          ctx.fillStyle = '#ff5a4d'
+          ctx.fill()
+        }
+        ctx.font = mono(22)
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = '#e2e9f0'
+        ctx.fillText('REPLAY', 890, 33)
+        ctx.textAlign = 'center'
+        outlined('THE DECIDING BLOW', 500, VIEW_H - 32, 22, '#8ea0b4')
+        const flashK = (pastEnd - REPLAY_HOLD) / 260
+        if (flashK < 1) {
+          ctx.fillStyle = `rgba(226,233,240,${(1 - flashK) * 0.7})`
+          ctx.fillRect(0, 0, 1000, VIEW_H)
+        }
+      }
+
       // Champion banner.
-      if (finished && run.elapsed > 0) {
+      if (finished && pastEnd > 0 && !inReplay) {
         const f = fighters[winner]
         ctx.fillStyle = 'rgba(5,8,12,0.88)'
         ctx.fillRect(0, VIEW_H - 96, 1000, 74)
@@ -923,7 +1027,11 @@ export default function Arena({
         ctx.font = mono(30)
         ctx.textAlign = 'center'
         ctx.fillStyle = '#ffd88a'
-        ctx.fillText(`${f.name.toUpperCase()} TAKES PICK 1`, 500, VIEW_H - 58)
+        ctx.fillText(
+          f.champ ? `${f.name.toUpperCase()} RETAINS PICK 1` : `${f.name.toUpperCase()} TAKES PICK 1`,
+          500,
+          VIEW_H - 58,
+        )
         ctx.globalAlpha = 1
       }
 
@@ -951,13 +1059,19 @@ export default function Arena({
         ctx.globalAlpha = 1
       } else if (inIntro && entranceIdx >= 0 && entranceIdx < n) {
         // The walker's lower-third.
-        const f = fighters[entranceIdx]
+        const f = fighters[entOrder[entranceIdx]]
         ctx.fillStyle = 'rgba(5,8,12,0.85)'
         ctx.fillRect(0, VIEW_H - 122, 1000, 100)
-        ctx.fillStyle = f.color
+        ctx.fillStyle = f.champ ? '#e8c35a' : f.color
         ctx.fillRect(0, VIEW_H - 122, 1000, 4)
-        outlined(f.callsign, 500, VIEW_H - 88, 34, f.color)
-        outlined(`${f.name.toUpperCase()} · #${f.number}`, 500, VIEW_H - 54, 18, '#e2e9f0')
+        outlined(f.callsign, 500, VIEW_H - 88, 34, f.champ ? '#e8c35a' : f.color)
+        outlined(
+          `${f.name.toUpperCase()} · #${f.number}${f.champ ? ' · DEFENDING PICK 1' : ''}`,
+          500,
+          VIEW_H - 54,
+          18,
+          '#e2e9f0',
+        )
         outlined(`SIGNATURE: ${f.move}`, 500, VIEW_H - 30, 14, '#8ea0b4')
       } else if (run.elapsed >= 0 && run.elapsed < 700) {
         outlined('FIGHT!', 500, 340, 84, '#ff9d2e')

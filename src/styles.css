@@ -171,3 +171,18 @@
     opacity: 0.55;
   }
 }
+
+/* Draft Fight: floating watch-party reactions. */
+@keyframes df-float-up {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    transform: translateY(-140px);
+    opacity: 0;
+  }
+}
+.df-float {
+  animation: df-float-up 2.5s ease-out forwards;
+}

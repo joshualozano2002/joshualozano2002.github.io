@@ -3,11 +3,13 @@ import Seo from '../components/Seo'
 import { Label, Lamp } from '../components/ui'
 import Arena, { introDurationMs } from '../draftfight/Arena'
 import { drawWrestler } from '../draftfight/sprite'
+import { POSTER_H, POSTER_W, renderPoster } from '../draftfight/poster'
 import { MAX_MANAGERS, MIN_MANAGERS, fightHash, readHash } from '../draftfight/codec'
 import { buildFighters } from '../draftfight/roster'
 import { simulate } from '../draftfight/sim'
 import { newSeed } from '../draftfight/rng'
 import { sharedNow, syncClock } from '../draftfight/clock'
+import { PARTY_EMOJI, useParty } from '../draftfight/useParty'
 import { primeAudio } from '../draftfight/sound'
 
 const SIZES = Array.from({ length: MAX_MANAGERS - MIN_MANAGERS + 1 }, (_, i) => MIN_MANAGERS + i)
@@ -101,6 +103,7 @@ function Setup({ onStart }) {
   const [league, setLeague] = useState('')
   const [size, setSize] = useState(12)
   const [names, setNames] = useState(() => Array(12).fill(''))
+  const [champ, setChamp] = useState(-1)
   const [mode, setMode] = useState('live')
   const [bell, setBell] = useState(defaultBellValue)
   const [error, setError] = useState('')
@@ -133,7 +136,13 @@ function Setup({ onStart }) {
       }
     }
     setError('')
-    onStart({ league: league.trim() || 'The League', managers, seed: newSeed(), startAt })
+    onStart({
+      league: league.trim() || 'The League',
+      managers,
+      seed: newSeed(),
+      startAt,
+      champ: champ >= 0 && champ < managers.length ? champ : -1,
+    })
   }
 
   return (
@@ -204,8 +213,32 @@ function Setup({ onStart }) {
       </div>
 
       <div className="mt-8 mb-2 flex items-center gap-2.5">
+        <Lamp color="cyan" />
+        <Label className="text-cyan">Step 04 · Defending Pick 1</Label>
+      </div>
+      <p className="mt-1 text-xs text-mute">
+        Optional: whoever held Pick 1 last season enters last, in the gold. It's a target on their
+        back, not an edge — the fight stays dead even.
+      </p>
+      <select
+        value={champ}
+        onChange={(e) => setChamp(Number(e.target.value))}
+        aria-label="Defending champion"
+        className="mt-3 rounded-xs border border-hairline bg-void px-3 py-2 text-sm text-ink outline-none [color-scheme:dark] focus:border-amber"
+      >
+        <option value={-1}>Nobody — first season</option>
+        {names.map((v, i) =>
+          v.trim() ? (
+            <option key={i} value={i}>
+              {v.trim()}
+            </option>
+          ) : null,
+        )}
+      </select>
+
+      <div className="mt-8 mb-2 flex items-center gap-2.5">
         <Lamp color="annunciator" />
-        <Label style={{ color: 'var(--color-annunciator)' }}>Step 04 · Bell time</Label>
+        <Label style={{ color: 'var(--color-annunciator)' }}>Step 05 · Bell time</Label>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {[
@@ -351,7 +384,7 @@ export default function DraftFight() {
   }, [])
 
   const fighters = useMemo(
-    () => (spec ? buildFighters(spec.seed, spec.managers) : null),
+    () => (spec ? buildFighters(spec.seed, spec.managers, spec.champ ?? -1) : null),
     [spec],
   )
   const fight = useMemo(
@@ -376,6 +409,7 @@ export default function DraftFight() {
   }, [])
 
   const arenaCtl = useRef(null)
+  const party = useParty(spec?.seed)
 
   const start = () => {
     primeAudio()
@@ -417,6 +451,7 @@ export default function DraftFight() {
   }, [callKey])
   const callShot = (id) => {
     setMyCall(id)
+    party.sendCall(id)
     try {
       localStorage.setItem(callKey, String(id))
     } catch {
@@ -508,6 +543,24 @@ export default function DraftFight() {
     return out
   }, [fight])
 
+  /** Build the group-chat poster and hand it over as a PNG download. */
+  const downloadPoster = useCallback(() => {
+    if (!spec || !fight || !fighters) return
+    const c = document.createElement('canvas')
+    c.width = POSTER_W
+    c.height = POSTER_H
+    renderPoster(c.getContext('2d'), { spec, fight, fighters, awards })
+    c.toBlob((blob) => {
+      if (!blob) return
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${spec.league.replace(/[^\w]+/g, '-').toLowerCase()}-draft-order.png`
+      a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    })
+  }, [spec, fight, fighters, awards])
+
   const resultText = useMemo(() => {
     if (!spec || !fight || !fighters) return ''
     const lines = fight.order.map((id, i) => `${i + 1}. ${fighters[id].name}`)
@@ -523,6 +576,7 @@ export default function DraftFight() {
         title="Draft Fight"
         description="Settle the fantasy draft order with a battle royale. Every manager gets a fighter, the last one standing takes pick one, and one link replays the exact same fight for the whole league."
         path="/draft-fight"
+        image="media/draft-fight-og.jpg"
         robots="noindex, nofollow"
       />
 
@@ -603,6 +657,11 @@ export default function DraftFight() {
                           <span className="min-w-0 flex-1">
                             <span className="block truncate text-sm font-medium text-ink">
                               {f.name}
+                              {f.champ ? (
+                                <span className="readout ml-2 text-[9px] tracking-[0.14em] text-[#e8c35a]">
+                                  DEFENDING PICK 1
+                                </span>
+                              ) : null}
                             </span>
                             <span className="readout block text-[10px]" style={{ color: f.color }}>
                               {f.callsign} · #{f.number}
@@ -648,6 +707,16 @@ export default function DraftFight() {
                         </span>
                       </p>
                     ) : null}
+                    {party.enabled && Object.keys(party.tally).length > 0 ? (
+                      <p className="readout mt-2 text-[11px] text-mute">
+                        The room's money:{' '}
+                        {Object.entries(party.tally)
+                          .sort((a, b) => b[1] - a[1])
+                          .slice(0, 3)
+                          .map(([who, count]) => `${fighters[+who]?.name ?? '?'} ×${count}`)
+                          .join(' · ')}
+                      </p>
+                    ) : null}
                   </div>
 
                   {isLive ? (
@@ -690,7 +759,7 @@ export default function DraftFight() {
                     </button>
                     <button
                       type="button"
-                      onClick={() => publish({ ...spec, seed: newSeed(), startAt: spec.startAt })}
+                      onClick={() => publish({ ...spec, seed: newSeed() })}
                       className="readout rounded-xs border border-hairline px-4 py-3 text-[11px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
                     >
                       RE-ROLL FIGHT
@@ -791,7 +860,26 @@ export default function DraftFight() {
                     </div>
 
                     {phase === 'live' ? (
-                      <Arena
+                      <div className="relative">
+                        {party.enabled && party.watching > 1 ? (
+                          <div className="absolute right-2 top-2 z-10 flex items-center gap-2 rounded-xs border border-hairline bg-void/80 px-2.5 py-1">
+                            <Lamp color="annunciator" />
+                            <span className="readout text-[10px] text-dim">
+                              {party.watching} WATCHING
+                            </span>
+                          </div>
+                        ) : null}
+                        {party.reactions.map((r) => (
+                          <span
+                            key={r.id}
+                            aria-hidden="true"
+                            className="df-float pointer-events-none absolute bottom-6 z-10 text-2xl"
+                            style={{ left: `${r.x}%` }}
+                          >
+                            {r.e}
+                          </span>
+                        ))}
+                        <Arena
                         fight={fight}
                         fighters={fighters}
                         playing={playing}
@@ -800,12 +888,29 @@ export default function DraftFight() {
                         runKey={runKey}
                         clock={isLive ? liveClock : undefined}
                         league={spec.league}
+                        champ={spec.champ ?? -1}
                         ctlRef={arenaCtl}
                         onElim={onElim}
                         onTicker={onTicker}
                         onClock={onClock}
                         onEnd={onEnd}
                       />
+                        {party.enabled ? (
+                          <div className="mt-2 flex justify-center gap-1.5">
+                            {PARTY_EMOJI.map((e) => (
+                              <button
+                                key={e}
+                                type="button"
+                                onClick={() => party.sendReact(e)}
+                                className="rounded-xs border border-hairline px-2.5 py-1 text-base transition-colors hover:border-amber"
+                                aria-label={`React ${e}`}
+                              >
+                                {e}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
                     ) : null}
                     {phase === 'live' && feed.length > 0 ? (
                       <div className="mt-3 rounded-xs border border-hairline bg-panel/80 px-4 py-2.5">
@@ -833,7 +938,9 @@ export default function DraftFight() {
                         <div className="flex items-end gap-5">
                           {winner ? <SpriteAvatar fighter={winner} pose="win" size={104} /> : null}
                           <div>
-                            <Label className="text-amber">Pick 01</Label>
+                            <Label className="text-amber">
+                              {winner?.champ ? 'Pick 01 · Retained' : 'Pick 01'}
+                            </Label>
                             <p className="mt-2 font-display text-3xl font-bold tracking-tight sm:text-4xl">
                               {winner?.name}
                             </p>
@@ -846,6 +953,13 @@ export default function DraftFight() {
                         <div className="flex flex-wrap gap-2">
                           <CopyButton value={resultText} label="Copy results" />
                           <CopyButton value={href} label="Copy link" />
+                          <button
+                            type="button"
+                            onClick={downloadPoster}
+                            className="readout rounded-xs border border-hairline-hot px-3 py-2 text-[11px] tracking-[0.16em] text-ink hover:border-amber hover:text-amber"
+                          >
+                            DOWNLOAD POSTER
+                          </button>
                           <button
                             type="button"
                             onClick={start}

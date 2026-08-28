@@ -33,8 +33,16 @@ const MOVE_B = [
   'POWERBOMB', 'SPINEBUSTER', 'HAYMAKER', 'BACKBREAKER', 'DROPKICK', 'ELBOW',
 ]
 
-/** Deterministic per-fighter identity: callsign, colour, and a jersey number. */
-export function buildFighters(seed, managers) {
+/**
+ * Deterministic per-fighter identity.
+ *
+ * Two sources feed it, deliberately split: callsign, number, and colours come
+ * from the FIGHT seed (fresh flavour every fight), while the body — skin,
+ * hair, build — comes from the MANAGER'S NAME. That means Josh is recognisably
+ * the same wrestler in every fight, every season, in every league that spells
+ * his name the same way. Rivalries need faces.
+ */
+export function buildFighters(seed, managers, champ = -1) {
   const rng = makeRng(`${seed}:roster`)
   // Move names draw from their own stream so adding them did not reshuffle
   // the identities that links already handed out.
@@ -49,7 +57,9 @@ export function buildFighters(seed, managers) {
     // Yellows read brighter than blues at the same lightness, so nudge each
     // band toward matching weight on the dark arena floor.
     const light = hue > 40 && hue < 150 ? 58 : hue > 200 && hue < 290 ? 68 : 63
-    const skin = SKINS[randInt(rng, SKINS.length)]
+    // Body from the name; normalised so "JOSH " and "josh" are the same guy.
+    const body = makeRng(`who:${name.trim().toLowerCase()}`)
+    const skin = SKINS[randInt(body, SKINS.length)]
     const color = `hsl(${hue} 82% ${light}%)`
     return {
       id: i,
@@ -67,13 +77,15 @@ export function buildFighters(seed, managers) {
       pal: {
         skin,
         shade: `hsl(${hue} 45% 26%)`,
-        hair: HAIRS[randInt(rng, HAIRS.length)],
-        hairStyle: randInt(rng, 5), // 0 bald · 1 short · 2 mohawk · 3 long · 4 headband
+        hair: HAIRS[randInt(body, HAIRS.length)],
+        hairStyle: randInt(body, 5), // 0 bald · 1 short · 2 mohawk · 3 long · 4 headband
         trunks: color,
         boots: `hsl(${hue} 62% ${Math.round(light * 0.62)}%)`,
         band: `hsl(${hue} 90% 78%)`,
-        gear: rng() < 0.35, // some wear a singlet instead of bare chest
+        gear: body() < 0.35, // some wear a singlet instead of bare chest
+        belt: i === champ, // the defending Pick 1 wears the gold all night
       },
+      champ: i === champ,
     }
   })
 }
