@@ -1,0 +1,627 @@
+import { useEffect, useRef } from 'react'
+import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
+import { drawShadow, drawWrestler } from './sprite.js'
+import { sfxElim, sfxHit, sfxWin } from './sound.js'
+
+/**
+ * Plays back a finished simulation as a wrestling broadcast.
+ *
+ * Nothing here decides anything — every position, hit and elimination was
+ * settled by sim.js before the first frame. The renderer only reads the
+ * timeline at the current time, which is what lets the same link produce the
+ * same fight on a 120Hz laptop and a struggling phone. Cosmetics (crowd
+ * flicker, confetti, camera shake) may use Math.random freely because they
+ * never feed back into the result.
+ *
+ * The camera: a hard-cam 3/4 view. World y is squashed and world x fans out
+ * with depth, so the square ring reads as a trapezoid and far fighters draw
+ * smaller. VIEW_H world-units of that projection are shown.
+ */
+
+const TAU = Math.PI * 2
+const CX = 500
+const BANNER_MS = 2200
+const INTRO_MS = 1600
+const VIEW_H = 780
+const RING_SPAN = RING_MAX - RING_MIN
+
+// Depth factor: 1 at the front rope, smaller toward the back.
+const depth = (y) => {
+  const k = Math.max(-0.25, Math.min(1.3, (y - RING_MIN) / RING_SPAN))
+  return 0.78 + 0.44 * k
+}
+const proj = (x, y) => {
+  const d = depth(y)
+  return [CX + (x - CX) * d, 415 + (y - 500) * 0.56, d]
+}
+
+const POWS = ['POW!', 'BAM!', 'WHAM!', 'SMACK!', 'THUD!']
+const ROPES = [
+  { h: 26, c: '#4fd6ea' },
+  { h: 46, c: '#8ea0b4' },
+  { h: 66, c: '#ff9d2e' },
+]
+const CORNERS = [
+  [RING_MIN, RING_MIN],
+  [RING_MAX, RING_MIN],
+  [RING_MAX, RING_MAX],
+  [RING_MIN, RING_MAX],
+]
+
+export default function Arena({
+  fight,
+  fighters,
+  playing = false,
+  speed = 1,
+  sound = false,
+  runKey = 0,
+  onElim,
+  onClock,
+  onEnd,
+}) {
+  const wrapRef = useRef(null)
+  const canvasRef = useRef(null)
+
+  // Live props the animation loop reads without being torn down and rebuilt.
+  const playingRef = useRef(playing)
+  const speedRef = useRef(speed)
+  const soundRef = useRef(sound)
+  const cbRef = useRef({ onElim, onClock, onEnd })
+
+  playingRef.current = playing
+  speedRef.current = speed
+  soundRef.current = sound
+  cbRef.current = { onElim, onClock, onEnd }
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const wrap = wrapRef.current
+    if (!canvas || !wrap || !fight) return
+    const ctx = canvas.getContext('2d')
+    const reduced =
+      typeof window !== 'undefined' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    let size = 0
+    let dpr = 1
+    const resize = () => {
+      const rect = wrap.getBoundingClientRect()
+      size = Math.max(280, Math.min(rect.width, 780))
+      dpr = Math.min(window.devicePixelRatio || 1, 2)
+      canvas.width = Math.round(size * dpr)
+      canvas.height = Math.round(size * (VIEW_H / 1000) * dpr)
+      canvas.style.width = `${size}px`
+      canvas.style.height = `${size * (VIEW_H / 1000)}px`
+    }
+    resize()
+    const ro = new ResizeObserver(resize)
+    ro.observe(wrap)
+
+    const { n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, winner } = fight
+    const run = {
+      elapsed: -INTRO_MS, // pre-roll: READY… FIGHT!
+      last: 0,
+      hit: 0,
+      elim: 0,
+      sparks: [],
+      pows: [],
+      confetti: [],
+      shake: 0,
+      banner: null,
+      ended: false,
+      clockAt: -1,
+      lastAtk: new Array(n).fill(-999),
+      lastDef: new Array(n).fill(-999),
+      faceX: new Array(n).fill(CX),
+      facing: new Array(n).fill(1),
+    }
+
+    const at = (arr, t, i) => arr[t * n + i]
+    const mono = (px_) => `700 ${px_}px "JetBrains Mono", ui-monospace, monospace`
+
+    /** One rope cable between two mat corners, sagging slightly at mid-span. */
+    const rope = (c1, c2, h, color, glow = false) => {
+      const [x1, y1, d1] = proj(c1[0], c1[1])
+      const [x2, y2, d2] = proj(c2[0], c2[1])
+      ctx.beginPath()
+      ctx.moveTo(x1, y1 - h * d1)
+      ctx.quadraticCurveTo(
+        (x1 + x2) / 2,
+        (y1 - h * d1 + (y2 - h * d2)) / 2 + 5,
+        x2,
+        y2 - h * d2,
+      )
+      ctx.lineWidth = 3.5 * ((d1 + d2) / 2)
+      ctx.strokeStyle = color
+      if (glow) {
+        ctx.shadowColor = color
+        ctx.shadowBlur = 8
+      }
+      ctx.stroke()
+      ctx.shadowBlur = 0
+    }
+
+    /** Corner post with turnbuckle pads at each rope height. */
+    const post = (wx, wy) => {
+      const [x, y, d] = proj(wx, wy)
+      const hgt = 84 * d
+      ctx.fillStyle = '#131b27'
+      ctx.fillRect(x - 5 * d, y - hgt, 10 * d, hgt)
+      ctx.fillStyle = '#2c3d51'
+      ctx.fillRect(x - 5 * d, y - hgt, 3 * d, hgt)
+      // Pads face centre ring.
+      const inX = wx < CX ? 1 : -1
+      for (const { h, c } of ROPES) {
+        ctx.fillStyle = c
+        ctx.fillRect(x - 5 * d + (inX > 0 ? 6 * d : -7 * d), y - h * d - 5 * d, 6 * d, 9 * d)
+      }
+    }
+
+    const outlined = (text, x, y, px_, fill) => {
+      ctx.font = mono(px_)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.lineWidth = Math.max(3, px_ / 5)
+      ctx.lineJoin = 'round'
+      ctx.strokeStyle = 'rgba(5,8,12,0.9)'
+      ctx.strokeText(text, x, y)
+      ctx.fillStyle = fill
+      ctx.fillText(text, x, y)
+    }
+
+    const draw = (now) => {
+      // Clamped at both ends: a long stall (backgrounded tab, slow phone)
+      // must not teleport the fight forward, and a clock that ever runs
+      // backwards must not rewind it into negative time.
+      const dt = run.last ? Math.max(0, Math.min(now - run.last, 120)) : 0
+      run.last = now
+
+      if (playingRef.current && !run.ended) {
+        run.elapsed += dt * speedRef.current
+      }
+
+      const tf = Math.max(0, Math.min((run.elapsed / 1000) * TICK_HZ, ticks - 1))
+      const t0 = Math.floor(tf)
+      const t1 = Math.min(t0 + 1, ticks - 1)
+      const a = tf - t0
+      const animFrame = Math.floor(now / 130)
+
+      // Fire every event the clock has passed, in order, even at 4x speed.
+      if (run.elapsed >= 0) {
+        while (run.hit < hits.length && hits[run.hit].t <= t0) {
+          const h = hits[run.hit++]
+          run.lastAtk[h.a] = h.t
+          run.lastDef[h.d] = h.t
+          run.faceX[h.a] = h.x
+          run.faceX[h.d] = h.x
+          run.sparks.push({ x: h.x, y: h.y, life: 0, p: Math.min(h.p, 1.4) })
+          if (h.p > 0.85)
+            run.pows.push({
+              x: h.x,
+              y: h.y,
+              life: 0,
+              txt: POWS[run.hit % POWS.length],
+              rot: (Math.random() - 0.5) * 0.4,
+            })
+          run.shake = Math.min(run.shake + 2 + h.p * 3.5, 15)
+          if (soundRef.current) sfxHit(h.p)
+        }
+        while (run.elim < elims.length && elims[run.elim].t <= t0) {
+          const e = elims[run.elim++]
+          run.banner = { at: now, e }
+          run.shake = 17
+          if (soundRef.current) sfxElim()
+          cbRef.current.onElim?.(e)
+        }
+      }
+
+      let aliveNow = 0
+      for (let i = 0; i < n; i++) if (at(state, t0, i) === 2) aliveNow++
+
+      const secs = Math.max(0, run.elapsed / 1000)
+      if (run.clockAt < 0 || secs - run.clockAt > 0.2 || aliveNow <= 1) {
+        run.clockAt = secs
+        cbRef.current.onClock?.(secs, aliveNow)
+      }
+
+      if (!run.ended && tf >= ticks - 1) {
+        run.ended = true
+        if (soundRef.current) sfxWin()
+        cbRef.current.onEnd?.()
+      }
+      const finished = aliveNow <= 1
+
+      // ---- paint (world coords: 1000 wide, VIEW_H tall) ----
+      const s = size / 1000
+      run.shake *= 0.86
+      const sh = reduced ? 0 : run.shake
+      const sx = sh > 0.2 ? (Math.random() - 0.5) * sh : 0
+      const sy = sh > 0.2 ? (Math.random() - 0.5) * sh : 0
+      ctx.setTransform(dpr * s, 0, 0, dpr * s, sx * dpr, sy * dpr)
+
+      ctx.fillStyle = '#04060a'
+      ctx.fillRect(-40, -40, 1080, VIEW_H + 80)
+
+      // House lights: two beams crossing on the ring.
+      for (const [bx, col] of [
+        [180, 'rgba(79,214,234,0.05)'],
+        [820, 'rgba(255,157,46,0.05)'],
+      ]) {
+        ctx.beginPath()
+        ctx.moveTo(bx - 60, -20)
+        ctx.lineTo(bx + 60, -20)
+        ctx.lineTo(640, 470)
+        ctx.lineTo(360, 470)
+        ctx.closePath()
+        ctx.fillStyle = col
+        ctx.fill()
+      }
+
+      // The crowd: rows of heads in the dark, camera flashes popping.
+      const flashClock = Math.floor(now / 140)
+      for (let row = 0; row < 6; row++) {
+        const ry = 34 + row * 25
+        const count = 24 + row * 5
+        const rad = 5.5 + row * 1.1
+        for (let i = 0; i < count; i++) {
+          const hsh = (i * 73856093) ^ (row * 19349663)
+          const rx = 14 + (972 * i) / (count - 1) + ((hsh >> 3) % 11) - 5
+          ctx.beginPath()
+          ctx.arc(rx, ry + ((hsh >> 7) % 7), rad, 0, TAU)
+          ctx.fillStyle = ['#10161f', '#141c28', '#182130', '#1a2433'][hsh & 3]
+          ctx.fill()
+          const flashRate = finished ? 23 : 97
+          if (!reduced && ((hsh ^ flashClock) % flashRate) === 0) {
+            ctx.fillStyle = 'rgba(240,248,255,0.9)'
+            ctx.fillRect(rx - 1.5, ry - 2, 3, 3)
+          }
+        }
+      }
+      // Haze between crowd and ringside.
+      const hazeG = ctx.createLinearGradient(0, 150, 0, 240)
+      hazeG.addColorStop(0, 'rgba(4,6,10,0)')
+      hazeG.addColorStop(1, 'rgba(4,6,10,0.85)')
+      ctx.fillStyle = hazeG
+      ctx.fillRect(0, 150, 1000, 90)
+
+      // Ringside floor.
+      const floorG = ctx.createLinearGradient(0, 200, 0, VIEW_H)
+      floorG.addColorStop(0, '#070b12')
+      floorG.addColorStop(1, '#0b1019')
+      ctx.fillStyle = floorG
+      ctx.fillRect(0, 200, 1000, VIEW_H - 200)
+
+      // ---- the ring ----
+      const [tlx, tly] = proj(RING_MIN, RING_MIN)
+      const [trx, try_] = proj(RING_MAX, RING_MIN)
+      const [brx, bry] = proj(RING_MAX, RING_MAX)
+      const [blx, bly] = proj(RING_MIN, RING_MAX)
+
+      // Apron skirt below the front edge.
+      ctx.beginPath()
+      ctx.moveTo(blx, bly)
+      ctx.lineTo(brx, bry)
+      ctx.lineTo(brx + 14, bry + 62)
+      ctx.lineTo(blx - 14, bly + 62)
+      ctx.closePath()
+      ctx.fillStyle = '#0c1320'
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(255,157,46,0.55)'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      ctx.moveTo(blx, bly + 3)
+      ctx.lineTo(brx, bry + 3)
+      ctx.stroke()
+      ctx.font = mono(21)
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = 'rgba(142,160,180,0.32)'
+      ctx.fillText('D R A F T   F I G H T', (blx + brx) / 2, bly + 32)
+
+      // Side skirts, thin.
+      ctx.fillStyle = '#0a101b'
+      ctx.beginPath()
+      ctx.moveTo(tlx, tly)
+      ctx.lineTo(blx, bly)
+      ctx.lineTo(blx - 14, bly + 62)
+      ctx.lineTo(tlx - 6, tly + 40)
+      ctx.closePath()
+      ctx.fill()
+      ctx.beginPath()
+      ctx.moveTo(trx, try_)
+      ctx.lineTo(brx, bry)
+      ctx.lineTo(brx + 14, bry + 62)
+      ctx.lineTo(trx + 6, try_ + 40)
+      ctx.closePath()
+      ctx.fill()
+
+      // Mat.
+      const matG = ctx.createLinearGradient(0, tly, 0, bly)
+      matG.addColorStop(0, '#26344a')
+      matG.addColorStop(1, '#1d2939')
+      ctx.beginPath()
+      ctx.moveTo(tlx, tly)
+      ctx.lineTo(trx, try_)
+      ctx.lineTo(brx, bry)
+      ctx.lineTo(blx, bly)
+      ctx.closePath()
+      ctx.fillStyle = matG
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(226,233,240,0.14)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+
+      // Centre-ring markings.
+      const [mcx, mcy, mcd] = proj(CX, CX)
+      ctx.beginPath()
+      ctx.ellipse(mcx, mcy, 170 * mcd, 170 * mcd * 0.56, 0, 0, TAU)
+      ctx.strokeStyle = 'rgba(255,157,46,0.14)'
+      ctx.lineWidth = 3
+      ctx.stroke()
+      ctx.font = mono(19)
+      ctx.fillStyle = 'rgba(226,233,240,0.1)'
+      ctx.fillText('DRAFT FIGHT', mcx, mcy)
+
+      // Back and side ropes + back posts, all behind the fighters.
+      post(...CORNERS[0])
+      post(...CORNERS[1])
+      for (const { h, c } of ROPES) {
+        rope(CORNERS[0], CORNERS[1], h, c, c === '#ff9d2e')
+        rope(CORNERS[0], CORNERS[3], h, c)
+        rope(CORNERS[1], CORNERS[2], h, c)
+      }
+
+      // ---- fighters ----
+      // Split: in the ring (drawn between rope layers) vs out/flying (in front).
+      const inRing = []
+      const outside = []
+      for (let i = 0; i < n; i++) {
+        const st = at(state, t0, i)
+        const wx = at(px, t0, i) * (1 - a) + at(px, t1, i) * a
+        const wy = at(py, t0, i) * (1 - a) + at(py, t1, i) * a
+        ;(st === 2 ? inRing : outside).push({ i, st, wx, wy })
+      }
+      inRing.sort((p, q) => p.wy - q.wy)
+      outside.sort((p, q) => p.wy - q.wy)
+
+      const drawOne = ({ i, st, wx, wy }) => {
+        const f = fighters[i]
+        const [X, Y, d] = proj(wx, wy)
+        const u = 3.5 * d
+
+        if (st === 3 || st === 1) {
+          // Flying over the ropes, then flat at ringside.
+          const p = st === 1 ? Math.min(1, (tf - koTick[i]) / 26) : 1
+          const z = st === 1 ? Math.sin(p * Math.PI) * 120 * d : 0
+          ctx.save()
+          ctx.translate(X, Y + 18 * d)
+          drawShadow(ctx, 20 * d, 6 * d, st === 1 ? 0.25 : 0.42)
+          ctx.restore()
+          ctx.save()
+          ctx.translate(X, Y + 18 * d - z)
+          if (st === 1) ctx.rotate(p * Math.PI * 2.5 * (i % 2 ? 1 : -1))
+          ctx.globalAlpha = st === 3 ? 0.88 : 1
+          drawWrestler(ctx, f.pal, 'ko', 0, run.facing[i], u)
+          ctx.globalAlpha = 1
+          ctx.restore()
+          if (st === 3) {
+            // The pick this knockout settled, resting on the body. Identity
+            // lives on the draft board; down here the number is the story.
+            outlined(`#${pickOf[i]}`, X, Y - 15 * d, 15, '#ff9d2e')
+          }
+          return
+        }
+
+        // Alive. Choose pose from the recent event record.
+        const isWinner = finished && i === winner
+        let pose = 'idle'
+        if (isWinner) pose = 'win'
+        else if (t0 - run.lastDef[i] < 7) pose = 'hurt'
+        else if (t0 - run.lastAtk[i] < 6) pose = 'punch'
+        else {
+          const mdx = at(px, t1, i) - at(px, t0, i)
+          const mdy = at(py, t1, i) - at(py, t0, i)
+          if (mdx * mdx + mdy * mdy > 0.5) pose = 'walk'
+          if (Math.abs(mdx) > 0.3) run.facing[i] = mdx > 0 ? 1 : -1
+        }
+        if (pose === 'punch' || pose === 'hurt')
+          run.facing[i] = run.faceX[i] >= wx ? 1 : -1
+
+        if (isWinner) {
+          // Spotlight narrows onto the champion.
+          ctx.beginPath()
+          ctx.moveTo(X - 26, -20)
+          ctx.lineTo(X + 26, -20)
+          ctx.lineTo(X + 60 * d, Y + 22 * d)
+          ctx.lineTo(X - 60 * d, Y + 22 * d)
+          ctx.closePath()
+          ctx.fillStyle = 'rgba(255,225,160,0.13)'
+          ctx.fill()
+        }
+
+        ctx.save()
+        ctx.translate(X, Y + 20 * d)
+        drawShadow(ctx, 17 * d, 5.5 * d)
+        drawWrestler(ctx, f.pal, pose, animFrame + i, run.facing[i], u)
+        ctx.restore()
+
+        // Hit flash on whoever just took one.
+        if (t0 - run.lastDef[i] < 3 && !reduced) {
+          ctx.save()
+          ctx.globalAlpha = 0.35
+          ctx.translate(X, Y + 20 * d)
+          drawWrestler(
+            ctx,
+            { ...f.pal, skin: '#fff', trunks: '#fff', hair: '#fff', boots: '#fff', band: '#fff', shade: '#fff' },
+            pose,
+            animFrame + i,
+            run.facing[i],
+            u,
+          )
+          ctx.restore()
+        }
+
+        if (!finished) {
+          // Health bar over the head.
+          const health = at(hp, t0, i)
+          const bw = 36 * d
+          ctx.fillStyle = 'rgba(5,8,12,0.75)'
+          ctx.fillRect(X - bw / 2 - 1, Y - 62 * d - 1, bw + 2, 6)
+          ctx.fillStyle = health > 0.35 ? f.color : '#ff5a4d'
+          ctx.fillRect(X - bw / 2, Y - 62 * d, bw * Math.max(health, 0.02), 4)
+        }
+        outlined(f.short, X, Y + 32 * d, 14, isWinner ? '#ffd88a' : 'rgba(226,233,240,0.92)')
+      }
+
+      for (const fgt of inRing) drawOne(fgt)
+
+      // Front rope + front posts over the in-ring action.
+      for (const { h, c } of ROPES) rope(CORNERS[3], CORNERS[2], h, c, c === '#ff9d2e')
+      post(...CORNERS[2])
+      post(...CORNERS[3])
+
+      // Bodies at ringside land in front of everything.
+      for (const fgt of outside) drawOne(fgt)
+
+      // ---- FX ----
+      for (let i = run.sparks.length - 1; i >= 0; i--) {
+        const sp = run.sparks[i]
+        sp.life += dt / 360
+        if (sp.life >= 1) {
+          run.sparks.splice(i, 1)
+          continue
+        }
+        const [X, Y, d] = proj(sp.x, sp.y)
+        ctx.beginPath()
+        ctx.arc(X, Y - 20 * d, (6 + sp.life * 40 * sp.p) * d, 0, TAU)
+        ctx.lineWidth = 4 * (1 - sp.life)
+        ctx.strokeStyle = `rgba(255,220,150,${(1 - sp.life) * 0.85})`
+        ctx.stroke()
+      }
+      for (let i = run.pows.length - 1; i >= 0; i--) {
+        const p = run.pows[i]
+        p.life += dt / 520
+        if (p.life >= 1) {
+          run.pows.splice(i, 1)
+          continue
+        }
+        const [X, Y, d] = proj(p.x, p.y)
+        ctx.save()
+        ctx.translate(X, Y - (34 + p.life * 30) * d)
+        ctx.rotate(p.rot)
+        ctx.globalAlpha = p.life > 0.6 ? (1 - p.life) * 2.5 : 1
+        outlined(p.txt, 0, 0, 26 * d, p.life % 0.2 > 0.1 ? '#ffd88a' : '#ff9d2e')
+        ctx.restore()
+        ctx.globalAlpha = 1
+      }
+
+      // Confetti for the champion.
+      if (finished && !reduced) {
+        if (run.confetti.length < 130)
+          for (let k = 0; k < 3; k++)
+            run.confetti.push({
+              x: Math.random() * 1000,
+              y: -14,
+              vx: (Math.random() - 0.5) * 1.1,
+              vy: 1.6 + Math.random() * 2.2,
+              c: ['#ff9d2e', '#4fd6ea', '#e264d8', '#48e08a', '#e2e9f0'][k % 5],
+              r: Math.random() * TAU,
+            })
+        for (let i = run.confetti.length - 1; i >= 0; i--) {
+          const c = run.confetti[i]
+          c.x += c.vx + Math.sin(c.y / 40 + c.r) * 0.8
+          c.y += c.vy * (dt / 16.7)
+          c.r += 0.08
+          if (c.y > VIEW_H + 20) {
+            run.confetti.splice(i, 1)
+            continue
+          }
+          ctx.save()
+          ctx.translate(c.x, c.y)
+          ctx.rotate(c.r)
+          ctx.fillStyle = c.c
+          ctx.fillRect(-4, -2.5, 8, 5)
+          ctx.restore()
+        }
+      }
+
+      // Elimination call-out.
+      if (run.banner && now - run.banner.at < BANNER_MS && !finished) {
+        const k = (now - run.banner.at) / BANNER_MS
+        const f = fighters[run.banner.e.id]
+        ctx.globalAlpha = k > 0.78 ? (1 - k) * 4.5 : 1
+        ctx.fillStyle = 'rgba(5,8,12,0.88)'
+        ctx.fillRect(0, VIEW_H - 108, 1000, 86)
+        ctx.fillStyle = f.color
+        ctx.fillRect(0, VIEW_H - 108, 1000, 4)
+        ctx.font = mono(30)
+        ctx.textAlign = 'center'
+        ctx.fillStyle = '#e2e9f0'
+        ctx.fillText(`${f.name.toUpperCase()} IS OVER THE TOP ROPE`, 500, VIEW_H - 76)
+        ctx.font = mono(22)
+        ctx.fillStyle = '#ff9d2e'
+        ctx.fillText(`PICK ${run.banner.e.pick}`, 500, VIEW_H - 44)
+        ctx.globalAlpha = 1
+      }
+
+      // Champion banner.
+      if (finished && run.elapsed > 0) {
+        const f = fighters[winner]
+        ctx.fillStyle = 'rgba(5,8,12,0.88)'
+        ctx.fillRect(0, VIEW_H - 96, 1000, 74)
+        ctx.fillStyle = '#ff9d2e'
+        ctx.fillRect(0, VIEW_H - 96, 1000, 4)
+        const pulse = reduced ? 1 : 0.75 + 0.25 * Math.sin(now / 220)
+        ctx.globalAlpha = pulse
+        ctx.font = mono(30)
+        ctx.textAlign = 'center'
+        ctx.fillStyle = '#ffd88a'
+        ctx.fillText(`${f.name.toUpperCase()} TAKES PICK 1`, 500, VIEW_H - 58)
+        ctx.globalAlpha = 1
+      }
+
+      // Pre-roll overlay.
+      if (run.elapsed < 0) {
+        ctx.fillStyle = 'rgba(4,6,10,0.55)'
+        ctx.fillRect(0, 0, 1000, VIEW_H)
+        const late = run.elapsed > -650
+        outlined(late ? 'FIGHT!' : 'READY…', 500, 340, late ? 84 : 56, late ? '#ff9d2e' : '#8ea0b4')
+      }
+
+      // Screen dressing, in device pixels so the lines stay crisp.
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+      const H = size * (VIEW_H / 1000)
+      if (!reduced) {
+        ctx.fillStyle = 'rgba(0,0,0,0.15)'
+        for (let yy = 0; yy < H; yy += 3) ctx.fillRect(0, yy, size, 1)
+      }
+      const vig = ctx.createRadialGradient(
+        size / 2, H / 2, size * 0.34,
+        size / 2, H / 2, size * 0.74,
+      )
+      vig.addColorStop(0, 'rgba(0,0,0,0)')
+      vig.addColorStop(1, 'rgba(0,0,0,0.5)')
+      ctx.fillStyle = vig
+      ctx.fillRect(0, 0, size, H)
+
+      raf = requestAnimationFrame(draw)
+    }
+
+    let raf = requestAnimationFrame(draw)
+    return () => {
+      cancelAnimationFrame(raf)
+      ro.disconnect()
+    }
+  }, [fight, fighters, runKey])
+
+  return (
+    <div ref={wrapRef} className="flex w-full justify-center">
+      <canvas
+        ref={canvasRef}
+        className="rounded-xs border border-hairline"
+        role="img"
+        aria-label="Draft fight ring"
+      />
+    </div>
+  )
+}

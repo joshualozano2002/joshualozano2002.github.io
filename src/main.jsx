@@ -7,6 +7,7 @@ import Mission from './routes/Mission'
 import Campaign from './routes/Campaign'
 import Dossier from './routes/Dossier'
 import Contact from './routes/Contact'
+import DraftFight from './routes/DraftFight'
 import NotFound from './routes/NotFound'
 import { missions } from './data/missions'
 
@@ -26,6 +27,8 @@ export const routes = [
       { path: 'campaign', element: <Campaign /> },
       { path: 'dossier', element: <Dossier /> },
       { path: 'contact', element: <Contact /> },
+      // Unlisted: reached by invite link, deliberately kept out of the nav.
+      { path: 'draft-fight', element: <DraftFight /> },
       { path: '*', element: <NotFound /> },
     ],
   },

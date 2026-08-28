@@ -7,7 +7,15 @@ import { profile } from '../data/profile'
  * description, canonical URL, and social card so crawlers see real metadata
  * instead of one shared shell.
  */
-export default function Seo({ title, description, path = '/', image, type = 'website', jsonLd }) {
+export default function Seo({
+  title,
+  description,
+  path = '/',
+  image,
+  type = 'website',
+  jsonLd,
+  robots = 'index, follow',
+}) {
   const fullTitle = path === '/' ? title : `${title} · ${profile.name}`
   const url = absUrl(path)
   const img = `${absUrl('/')}/${(image ?? 'media/flight-deck.webp').replace(/^\//, '')}`.replace(
@@ -34,7 +42,7 @@ export default function Seo({ title, description, path = '/', image, type = 'web
       <meta name="twitter:image" content={img} />
 
       <meta name="author" content={profile.name} />
-      <meta name="robots" content="index, follow" />
+      <meta name="robots" content={robots} />
 
       {jsonLd ? (
         <script type="application/ld+json">{JSON.stringify(jsonLd)}</script>
