@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
 import { drawChair, drawRef, drawShadow, drawWrestler } from './sprite.js'
-import { sfxBell, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, sfxWin } from './sound.js'
+import { sfxBell, sfxBuzzer, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, sfxWin } from './sound.js'
 
 /**
  * Plays back a finished simulation as a wrestling broadcast.
@@ -25,14 +25,16 @@ const REPLAY_HOLD = 3000 // celebration before the slow-mo
 const REPLAY_PRE = 75 // ticks of runway before the deciding blow
 const REPLAY_POST = 25
 const REPLAY_RATE = 0.4
-const INTRO_OPEN = 2600 // the tonight-card before the first entrance
+const INTRO_OPEN = 2600 // the tonight-card before the opening pair walks
 const INTRO_PER = 1800 // one wrestler's walk
+const APPROACH = 52 // ticks a rumble entrant spends coming down the aisle
 
 /**
- * How long the entrances run before the bell. Exported so the page can open
- * the broadcast early enough for a live audience to catch the whole pre-show.
+ * The pre-show: tonight card plus the opening pair's entrances. Everyone else
+ * arrives DURING the fight — that's the rumble. Exported so the page can open
+ * a live broadcast early enough to catch the whole pre-show.
  */
-export const introDurationMs = (n) => INTRO_OPEN + n * INTRO_PER
+export const introDurationMs = () => INTRO_OPEN + 2 * INTRO_PER
 const VIEW_H = 780
 const RING_SPAN = RING_MAX - RING_MIN
 
@@ -115,8 +117,11 @@ export default function Arena({
     const ro = new ResizeObserver(resize)
     ro.observe(wrap)
 
-    const { n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, objects, winner } = fight
-    const introMs = introDurationMs(n)
+    const {
+      n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, objects, winner,
+      entries, entryOrder, lastEntryT,
+    } = fight
+    const introMs = introDurationMs()
     const durMs = fight.durationMs
     const lastElim = elims[elims.length - 1]
     const replayStart = Math.max(0, (lastElim?.t ?? 0) - REPLAY_PRE)
@@ -150,7 +155,8 @@ export default function Arena({
       koAt: -9999,
       hurtCalled: new Array(n).fill(false),
       milestones: new Set(),
-      introIdx: -2, // which entrance is on, -2 before any
+      introIdx: -2, // which pre-show entrance is on, -2 before any
+      arrived: new Set(), // rumble entries already announced
       obj: 0, // pointer into the chair event feed
       chair: { mode: 'none', x: 0, y: 0, fx: 0, fy: 0, t0: 0, by: -1 },
       belled: false,
@@ -369,26 +375,57 @@ export default function Arena({
       // During the epilogue the HUD keeps reporting the settled fight.
       const aliveHud = run.elapsed > durMs && !inReplay ? (n > 1 ? 1 : n) : aliveNow
 
+      // The rumble clock: buzz, reveal, and call each arrival.
+      const nextEntry = run.elapsed >= 0 ? entries.find((e) => e.t > t0) : null
+      if (run.elapsed >= 0 && !inReplay) {
+        for (const en of entries) {
+          if (t0 >= en.t - APPROACH && !run.arrived.has(en.num)) {
+            run.arrived.add(en.num)
+            const f = fighters[en.id]
+            if (t0 - en.t <= 60) {
+              if (soundRef.current) {
+                sfxBuzzer()
+                sfxEntrance(en.num + (f.champ ? 5 : 0))
+              }
+              say(
+                f.champ
+                  ? `Entry #${en.num} — THE DEFENDING PICK 1! ${f.name}, ${f.callsign}!`
+                  : `Entry #${en.num}: ${f.name} — ${f.callsign}!`,
+              )
+              run.banner = null // entrance card takes the lower third
+              run.entryCard = { at: now, en }
+            }
+          }
+        }
+      }
+
       // Booth calls on the shape of the fight.
       if (run.elapsed >= 0) {
+        const enteredAll = t0 >= lastEntryT
         if (!run.milestones.has('bell')) {
           run.milestones.add('bell')
-          say(`The bell rings — ${n} managers, one ring, and only one Pick 1.`)
+          say(
+            `The bell rings — two start it off, and a new manager hits the ring every twenty seconds or so. Last one standing takes Pick 1.`,
+          )
           if (soundRef.current && run.elapsed < 1500 && !run.belled) {
             run.belled = true
             sfxBell()
           }
         }
-        const half = Math.ceil(n / 2)
-        if (aliveNow <= half && aliveNow > 3 && !run.milestones.has('half')) {
-          run.milestones.add('half')
-          say(`Half the field is on the floor — ${aliveNow} still swinging.`)
+        if (enteredAll && !run.milestones.has('full')) {
+          run.milestones.add('full')
+          say(`That's everybody — ${aliveNow} in the ring and nowhere left to hide.`)
         }
-        if (aliveNow === 3 && !run.milestones.has('three')) {
+        const half = Math.ceil(n / 2)
+        if (run.elim >= half && !run.milestones.has('half')) {
+          run.milestones.add('half')
+          say(`Half the picks are settled — ${n - run.elim} managers still alive.`)
+        }
+        if (enteredAll && aliveNow === 3 && !run.milestones.has('three')) {
           run.milestones.add('three')
           say(`THREE LEFT. It is anyone's draft.`)
         }
-        if (aliveNow === 2 && run.prevAlive > 2) {
+        if (enteredAll && aliveNow === 2 && run.prevAlive > 2) {
           run.final2At = now
           run.milestones.add('two')
           const pair = []
@@ -443,7 +480,7 @@ export default function Arena({
       ctx.fillRect(-40, -40, 1080, VIEW_H + 80)
 
       // FINAL TWO: the camera leans in on the survivors.
-      const wantZoom = aliveNow === 2 && !finished && run.elapsed >= 0 ? 1 : 0
+      const wantZoom = aliveNow === 2 && t0 >= lastEntryT && !finished && run.elapsed >= 0 ? 1 : 0
       run.zoom += (wantZoom - run.zoom) * Math.min(1, dt / 500)
       ctx.save()
       if (run.zoom > 0.01) {
@@ -599,11 +636,9 @@ export default function Arena({
       // ---- fighters ----
       const introT = run.elapsed + introMs // 0..introMs while the entrances run
       const inIntro = run.elapsed < 0 && introT >= 0
-      const entranceIdx = inIntro ? Math.floor((introT - INTRO_OPEN) / INTRO_PER) : n
-      // The defending champ walks last, as is right and proper.
-      const entOrder = []
-      for (let i = 0; i < n; i++) if (i !== champ) entOrder.push(i)
-      if (champ >= 0 && champ < n) entOrder.push(champ)
+      const entranceIdx = inIntro ? Math.floor((introT - INTRO_OPEN) / INTRO_PER) : 2
+      // Only the opening pair walks before the bell; the rumble brings the rest.
+      const entOrder = [entryOrder[0], entryOrder[1]]
 
       // Split: in the ring (drawn between rope layers) vs out/flying (in front).
       const inRing = []
@@ -611,7 +646,7 @@ export default function Arena({
       if (inIntro) {
         // Pre-show cast: everyone who has entered stands on their mark; the
         // current wrestler walks the aisle from the tunnel to their spot.
-        for (let k = 0; k <= entranceIdx && k < n; k++) {
+        for (let k = 0; k <= entranceIdx && k < 2; k++) {
           const i = entOrder[k]
           const sx = at(px, 0, i)
           const sy = at(py, 0, i)
@@ -628,9 +663,27 @@ export default function Arena({
       } else if (run.elapsed >= 0) {
         for (let i = 0; i < n; i++) {
           const st = at(state, t0, i)
+          if (st === 0) continue // backstage, waiting on the buzzer
           const wx = at(px, t0, i) * (1 - a) + at(px, t1, i) * a
           const wy = at(py, t0, i) * (1 - a) + at(py, t1, i) * a
           ;(st === 2 ? inRing : outside).push({ i, st, wx, wy })
+        }
+        // Anyone whose buzzer just hit sprints the aisle to the ring apron.
+        if (!inReplay)
+        for (const en of entries) {
+          if (t0 >= en.t - APPROACH && t0 < en.t) {
+            const wp = (t0 + a - (en.t - APPROACH)) / APPROACH
+            const e = wp * wp * (3 - 2 * wp)
+            const tx = at(px, en.t, en.id)
+            const ty = at(py, en.t, en.id)
+            inRing.push({
+              i: en.id,
+              st: 2,
+              wx: 500 + (tx - 500) * e,
+              wy: 30 + (ty - 30) * e,
+              intro: 'walk',
+            })
+          }
         }
       }
       // Before the entrances begin, the ring stands empty under the lights.
@@ -638,7 +691,7 @@ export default function Arena({
       outside.sort((p, q) => p.wy - q.wy)
 
       // Entrance stings + booth intro lines, once per wrestler.
-      if (inIntro && entranceIdx >= 0 && entranceIdx < n && entranceIdx !== run.introIdx) {
+      if (inIntro && entranceIdx >= 0 && entranceIdx < 2 && entranceIdx !== run.introIdx) {
         run.introIdx = entranceIdx
         const who = entOrder[entranceIdx]
         const f = fighters[who]
@@ -964,7 +1017,7 @@ export default function Arena({
       }
 
       // Elimination call-out.
-      if (run.banner && now - run.banner.at < BANNER_MS && !finished) {
+      if (run.banner && now - run.banner.at < BANNER_MS && !finished && !(run.entryCard && now - run.entryCard.at < 2400)) {
         const k = (now - run.banner.at) / BANNER_MS
         const f = fighters[run.banner.e.id]
         ctx.globalAlpha = k > 0.78 ? (1 - k) * 4.5 : 1
@@ -1015,6 +1068,52 @@ export default function Arena({
         }
       }
 
+      // The rumble entry card, splashed across the lower third.
+      if (run.entryCard && now - run.entryCard.at < 2400 && !inReplay && run.elapsed >= 0) {
+        const k = (now - run.entryCard.at) / 2400
+        const f = fighters[run.entryCard.en.id]
+        ctx.globalAlpha = k > 0.78 ? (1 - k) * 4.5 : 1
+        ctx.fillStyle = 'rgba(5,8,12,0.88)'
+        ctx.fillRect(0, VIEW_H - 118, 1000, 96)
+        ctx.fillStyle = f.champ ? '#e8c35a' : f.color
+        ctx.fillRect(0, VIEW_H - 118, 1000, 4)
+        outlined(
+          `ENTRY #${run.entryCard.en.num} — ${f.callsign}`,
+          500,
+          VIEW_H - 84,
+          30,
+          f.champ ? '#e8c35a' : f.color,
+        )
+        outlined(
+          `${f.name.toUpperCase()} · #${f.number}${f.champ ? ' · DEFENDING PICK 1' : ''}`,
+          500,
+          VIEW_H - 52,
+          18,
+          '#e2e9f0',
+        )
+        outlined(`SIGNATURE: ${f.move}`, 500, VIEW_H - 28, 14, '#8ea0b4')
+        ctx.globalAlpha = 1
+      }
+
+      // Who's next? The clock knows; the name stays a surprise.
+      if (nextEntry && !inReplay && run.elapsed >= 0 && t0 < nextEntry.t - APPROACH) {
+        const secLeft = Math.ceil((nextEntry.t - APPROACH - tf) / TICK_HZ)
+        ctx.fillStyle = 'rgba(5,8,12,0.8)'
+        ctx.fillRect(12, 12, 252, 46)
+        ctx.fillStyle = secLeft <= 5 ? '#ff9d2e' : '#2c3d51'
+        ctx.fillRect(12, 12, 252, 3)
+        ctx.font = mono(20)
+        ctx.textAlign = 'left'
+        ctx.textBaseline = 'middle'
+        ctx.fillStyle = secLeft <= 5 ? '#ff9d2e' : '#8ea0b4'
+        ctx.fillText(
+          `NEXT ENTRANT  0:${String(Math.max(0, secLeft)).padStart(2, '0')}`,
+          26,
+          37,
+        )
+        ctx.textAlign = 'center'
+      }
+
       // Champion banner.
       if (finished && pastEnd > 0 && !inReplay) {
         const f = fighters[winner]
@@ -1057,7 +1156,7 @@ export default function Arena({
         outlined((league || 'DRAFT FIGHT').toUpperCase(), 500, 320, 52, '#ff9d2e')
         outlined(`${n} MANAGERS · ONE RING · ONE PICK 1`, 500, 388, 22, '#e2e9f0')
         ctx.globalAlpha = 1
-      } else if (inIntro && entranceIdx >= 0 && entranceIdx < n) {
+      } else if (inIntro && entranceIdx >= 0 && entranceIdx < 2) {
         // The walker's lower-third.
         const f = fighters[entOrder[entranceIdx]]
         ctx.fillStyle = 'rgba(5,8,12,0.85)'

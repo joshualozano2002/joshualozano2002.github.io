@@ -16,9 +16,12 @@
  * Geometry: a square wrestling ring. Fighters bounce off the ropes, and a
  * knockout throws you over the top rope — you fly out and land at ringside,
  * lined up in elimination order so the aftermath reads like a draft board.
+ *
+ * Format: a royal rumble. Two managers start at the bell; the rest enter one
+ * at a time on a seeded schedule. Entry order is drawn fresh per fight, so no
+ * roster slot is ever favoured — but the draw itself is part of the show.
  */
 import { makeRng, shuffle } from './rng.js'
-import { SPAWNS } from './spawns.js'
 
 export const TICK_HZ = 30
 export const WORLD = 1000
@@ -27,7 +30,6 @@ export const RING_MIN = 190
 export const RING_MAX = 810
 const CX = 500
 const CY = 500
-const MAX_TICKS = TICK_HZ * 180
 const REACH = 46
 const FLY_TICKS = 26 // over-the-rope flight, elimination to landing
 const OUTRO_TICKS = 160 // recorded celebration before the results panel takes over
@@ -56,12 +58,35 @@ const ramp = (t) => {
 export function simulate(seed, n) {
   const rng = makeRng(`${seed}:fight`)
 
+  // The rumble draw: who starts, and when everyone else's music hits.
+  const entryOrder = shuffle(rng, Array.from({ length: n }, (_, i) => i))
+  const entryTick = new Int32Array(n)
+  const entryX = new Float64Array(n)
+  const entries = [] // scheduled arrivals after the opening pair
+  {
+    let tAcc = 0
+    for (let k = 0; k < n; k++) {
+      const id = entryOrder[k]
+      if (k < 2) {
+        entryTick[id] = 0
+        entryX[id] = k === 0 ? 380 + rng() * 60 : 560 + rng() * 60
+      } else {
+        tAcc += Math.floor(TICK_HZ * (15 + rng() * 9))
+        entryTick[id] = tAcc
+        entryX[id] = 360 + rng() * 280
+        entries.push({ t: tAcc, id, num: k + 1 })
+      }
+    }
+  }
+  const lastEntryT = entries.length ? entries[entries.length - 1].t : 0
+  const MAX_TICKS = lastEntryT + TICK_HZ * 240
+
   // The steel chair. Its schedule and placement come from a separate stream,
   // drawn entirely up front, so the main combat stream is never disturbed.
   const objRng = makeRng(`${seed}:objects`)
   const chairPlan = [
-    { at: Math.floor(520 + objRng() * 440), ang: objRng(), rad: 95 + objRng() * 65 },
-    { at: Math.floor(1200 + objRng() * 400), ang: objRng(), rad: 95 + objRng() * 65 },
+    { at: Math.floor(lastEntryT * 0.45 + objRng() * 300), ang: objRng(), rad: 95 + objRng() * 65 },
+    { at: Math.floor(lastEntryT * 0.95 + objRng() * 300), ang: objRng(), rad: 95 + objRng() * 65 },
   ]
   const objects = [] // renderer + booth event feed
   let chairPlanIdx = 0
@@ -103,6 +128,7 @@ export function simulate(seed, n) {
   // Fight-story bookkeeping. Pure observation of the existing stream — none of
   // this may draw from rng, or every previously shared link changes its result.
   const lastHitBy = new Int32Array(n).fill(-1)
+  const lastHurtT = new Int32Array(n).fill(-9999)
   const lastSpec = new Int32Array(n).fill(-9999)
   let lastSpecAny = -9999 // signature moves are a moment; keep them scarce globally
   const sDmg = new Float64Array(n)
@@ -112,23 +138,18 @@ export function simulate(seed, n) {
   const sChair = new Float64Array(n)
   const sOut = new Int32Array(n).fill(-1)
 
-  // Which manager stands where is drawn, not derived from list position.
-  // Spawning next to a crowd is a real disadvantage, so tying it to roster
-  // order would quietly punish whoever the commissioner typed in first.
-  const slots = shuffle(rng, SPAWNS[n].slice())
-
   for (let i = 0; i < n; i++) {
-    const [ux, uy] = slots[i]
-    const spread = 240 + rng() * 40 // inside the ropes, spread around the ring
-    x[i] = CX + ux * spread
-    y[i] = CY + uy * spread
+    // Later entrants wait backstage at the tunnel; the opening pair squares up.
+    const opening = entryTick[i] === 0
+    x[i] = opening ? entryX[i] : 500
+    y[i] = opening ? 420 + rng() * 160 : 36
     hpMax[i] = 100 * (0.88 + rng() * 0.26)
     hp[i] = hpMax[i]
     speed[i] = 2.05 + rng() * 1.35
     power[i] = 0.78 + rng() * 0.48
     cool[i] = 6 + rng() * 18
     target[i] = -1
-    state[i] = 2
+    state[i] = entryTick[i] === 0 ? 2 : 0 // 0 = backstage, waiting for the buzzer
     // Drawn, not derived from i: re-aiming a tick after everyone else has
     // moved is worth something, and that edge must not follow a roster slot.
     phase[i] = Math.floor(rng() * 24)
@@ -139,7 +160,8 @@ export function simulate(seed, n) {
   // the processing order keeps that edge from attaching to a roster slot.
   const ord = shuffle(rng, Array.from({ length: n }, (_, i) => i))
 
-  let alive = n
+  let alive = 2
+  let entered = 2
   let ticks = 0
   let outro = 0
 
@@ -153,7 +175,18 @@ export function simulate(seed, n) {
     }
     ticks = t + 1
 
-    if (alive <= 1) {
+    // The buzzer: scheduled entrants hit the ring over the top rope.
+    for (let i = 0; i < n; i++) {
+      if (state[i] === 0 && t >= entryTick[i]) {
+        state[i] = 2
+        x[i] = entryX[i]
+        y[i] = LO + 10
+        alive++
+        entered++
+      }
+    }
+
+    if (alive <= 1 && entered === n) {
       outro++
       if (outro > OUTRO_TICKS) break
     }
@@ -235,7 +268,8 @@ export function simulate(seed, n) {
     }
 
     // Down to the final pairs the crowd wants an ending, not a stamina duel.
-    const dmgMul = ramp(t) * (alive <= 2 ? 1.3 : alive <= 3 ? 1.05 : 1)
+    const full = entered === n
+    const dmgMul = ramp(t, lastEntryT) * (full && alive <= 2 ? 1.3 : full && alive <= 3 ? 1.05 : 1)
     const forceEnd = t > MAX_TICKS - 150
 
     for (let q = 0; q < n; q++) {
@@ -255,8 +289,8 @@ export function simulate(seed, n) {
         }
         continue
       }
-      if (state[i] === 3) continue
-      if (alive <= 1) continue // the winner holds still for the celebration
+      if (state[i] === 3 || state[i] === 0) continue
+      if (alive <= 1 && entered === n) continue // the winner holds still for the celebration
 
       // Retarget when the current mark is down, or on a staggered timer.
       if (target[i] < 0 || state[target[i]] !== 2 || (t + phase[i]) % 24 === 0) {
@@ -288,11 +322,16 @@ export function simulate(seed, n) {
 
         cool[i] -= 1
         if (dist < REACH && cool[i] <= 0) {
-          const roll = 0.85 + rng() * 1.5
+          const roll = 0.62 + rng() * 0.62
           const chair = chairHolder === i
-          const dmg = roll * power[i] * dmgMul * (chair ? 2.2 : 1)
+          // A crowded ring spreads the punishment thin: total elimination pace
+          // stays steady as the ring fills, so the rumble builds instead of
+          // collapsing in waves. Solo showdowns still hit at full force.
+          const crowd = alive > 2 ? Math.min(1, 1.35 / alive) : 1
+          const dmg = roll * power[i] * dmgMul * crowd * (chair ? 2.2 : 1)
           hp[tg] -= dmg
           lastHitBy[tg] = i
+          lastHurtT[tg] = t
           sDmg[i] += dmg
           sTaken[tg] += dmg
           sHits[i]++
@@ -344,6 +383,14 @@ export function simulate(seed, n) {
           x[i] += bx * w
           y[i] += by * w
         }
+      }
+
+      // Catching your breath: three seconds without taking a hit and health
+      // starts creeping back. Active beatdowns still finish; what this stops
+      // is the whole ring wearing down in lockstep and collapsing at once.
+      if (hp[i] < hpMax[i] && t - lastHurtT[i] > TICK_HZ * 3) {
+        hp[i] += (0.085 * hpMax[i]) / 100
+        if (hp[i] > hpMax[i]) hp[i] = hpMax[i]
       }
 
       // A loose chair is irresistible: anyone close by drifts toward it.
@@ -438,14 +485,21 @@ export function simulate(seed, n) {
       }
 
       order.push(i)
-      elims.push({ t, id: i, x: x[i], y: y[i], pick: alive + 1, by: lastHitBy[i] })
+      // First one out picks last: the pick a knockout settles counts down from
+      // the full field, not from whoever happens to be in the ring right now.
+      elims.push({ t, id: i, x: x[i], y: y[i], pick: n - order.length + 1, by: lastHitBy[i] })
 
-      // Down to the final two, both fighters find a second wind. Symmetric, so
-      // it favours no one — it just guarantees the showdown is a real fight
-      // instead of a formality against someone already out on their feet.
-      if (alive === 2) {
+      // The survivors dig deep. Symmetric heals at the final four and the
+      // final two reset accumulated wear, so a late entry number is a real
+      // edge but never a coronation — the endgame belongs to everyone in it.
+      if (alive === 4 && entered === n) {
         for (let j = 0; j < n; j++) {
-          if (state[j] === 2 && hp[j] < hpMax[j] * 0.38) hp[j] = hpMax[j] * 0.38
+          if (state[j] === 2 && hp[j] < hpMax[j] * 0.5) hp[j] = hpMax[j] * 0.5
+        }
+      }
+      if (alive === 2 && entered === n) {
+        for (let j = 0; j < n; j++) {
+          if (state[j] === 2 && hp[j] < hpMax[j] * 0.45) hp[j] = hpMax[j] * 0.45
         }
       }
     }
@@ -462,7 +516,7 @@ export function simulate(seed, n) {
     kos: sKos[i],
     hits: sHits[i],
     chair: Math.round(sChair[i]),
-    survived: sOut[i] < 0 ? ticks : sOut[i],
+    survived: (sOut[i] < 0 ? ticks : sOut[i]) - entryTick[i],
   }))
 
   const picks = [winner, ...order.slice().reverse().filter((id) => id !== winner)]
@@ -480,6 +534,10 @@ export function simulate(seed, n) {
     state: pstate.subarray(0, ticks * n),
     koTick,
     pickOf,
+    entries,
+    entryTick,
+    entryOrder,
+    lastEntryT,
     stats,
     objects,
     hits,

@@ -120,6 +120,13 @@ export const sfxChair = (breaking = false) => {
   }
 }
 
+/** The entry buzzer — harsh, arena-wide, unmistakable. */
+export const sfxBuzzer = () => {
+  blip({ freq: 208, dur: 0.5, type: 'square', gain: 0.1 })
+  blip({ freq: 311, dur: 0.5, type: 'square', gain: 0.06 })
+  sfxRoar(0.5)
+}
+
 /** The bell that starts it. */
 export const sfxBell = () => {
   ;[0, 0.28, 0.56].forEach((d) => {
