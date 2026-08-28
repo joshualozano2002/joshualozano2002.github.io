@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
-import { drawShadow, drawWrestler } from './sprite.js'
-import { sfxChant, sfxElim, sfxHit, sfxSpecial, sfxWin } from './sound.js'
+import { drawChair, drawShadow, drawWrestler } from './sprite.js'
+import { sfxBell, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, sfxWin } from './sound.js'
 
 /**
  * Plays back a finished simulation as a wrestling broadcast.
@@ -21,7 +21,14 @@ import { sfxChant, sfxElim, sfxHit, sfxSpecial, sfxWin } from './sound.js'
 const TAU = Math.PI * 2
 const CX = 500
 const BANNER_MS = 2200
-const INTRO_MS = 1600
+const INTRO_OPEN = 2600 // the tonight-card before the first entrance
+const INTRO_PER = 1800 // one wrestler's walk
+
+/**
+ * How long the entrances run before the bell. Exported so the page can open
+ * the broadcast early enough for a live audience to catch the whole pre-show.
+ */
+export const introDurationMs = (n) => INTRO_OPEN + n * INTRO_PER
 const VIEW_H = 780
 const RING_SPAN = RING_MAX - RING_MIN
 
@@ -56,6 +63,8 @@ export default function Arena({
   sound = false,
   runKey = 0,
   clock, // live broadcast: () => ms since the bell; overrides playing/speed
+  league = '',
+  ctlRef, // page-facing controls: { skipIntro }
   onElim,
   onClock,
   onEnd,
@@ -101,9 +110,10 @@ export default function Arena({
     const ro = new ResizeObserver(resize)
     ro.observe(wrap)
 
-    const { n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, winner } = fight
+    const { n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, objects, winner } = fight
+    const introMs = introDurationMs(n)
     const run = {
-      elapsed: -INTRO_MS, // pre-roll: READY… FIGHT!
+      elapsed: -(introMs + 1600), // pre-roll countdown, then the entrances
       last: 0,
       hit: 0,
       elim: 0,
@@ -113,7 +123,7 @@ export default function Arena({
       shake: 0,
       banner: null,
       ended: false,
-      clockAt: -1,
+      clockAt: -1e9,
       lastAtk: new Array(n).fill(-999),
       lastDef: new Array(n).fill(-999),
       faceX: new Array(n).fill(CX),
@@ -129,6 +139,19 @@ export default function Arena({
       koAt: -9999,
       hurtCalled: new Array(n).fill(false),
       milestones: new Set(),
+      introIdx: -2, // which entrance is on, -2 before any
+      obj: 0, // pointer into the chair event feed
+      chair: { mode: 'none', x: 0, y: 0, fx: 0, fy: 0, t0: 0, by: -1 },
+      belled: false,
+    }
+
+    if (ctlRef) {
+      ctlRef.current = {
+        // On-demand only: jump the pre-show straight to the final countdown.
+        skipIntro: () => {
+          if (run.elapsed < -1600) run.elapsed = -1600
+        },
+      }
     }
 
     const say = (text) => cbRef.current.onTicker?.(text)
@@ -230,6 +253,16 @@ export default function Arena({
               run.shake = 20
               if (soundRef.current) sfxSpecial()
               say(`${A.name} connects with the ${A.move} on ${fighters[h.d].name}!`)
+            } else if (h.c) {
+              run.pows.push({
+                x: h.x,
+                y: h.y,
+                life: 0,
+                txt: 'CLANG!',
+                silver: true,
+                rot: (Math.random() - 0.5) * 0.4,
+              })
+              if (soundRef.current) sfxChair()
             } else if (h.p > 0.85) {
               run.pows.push({
                 x: h.x,
@@ -241,6 +274,28 @@ export default function Arena({
             }
             run.shake = Math.min(run.shake + 2 + h.p * 3.5, 15)
             if (soundRef.current) sfxHit(h.p)
+          }
+        }
+        while (run.obj < objects.length && objects[run.obj].t <= t0) {
+          const o = objects[run.obj++]
+          const ch = run.chair
+          if (o.k === 'spawn') {
+            Object.assign(ch, { mode: 'sliding', x: o.x, y: o.y, fx: o.fx, fy: o.fy, t0: o.t })
+            if (t0 - o.t <= 45) say('A STEEL CHAIR just slid into the ring!')
+          } else if (o.k === 'pick') {
+            ch.mode = 'held'
+            ch.by = o.by
+            if (t0 - o.t <= 45) say(`${fighters[o.by].name} has the STEEL CHAIR!`)
+          } else if (o.k === 'break') {
+            ch.mode = 'none'
+            ch.by = -1
+            if (t0 - o.t <= 45) {
+              say(`${fighters[o.by].name} breaks the chair over ${fighters[o.on].name}!`)
+              if (soundRef.current) sfxChair(true)
+            }
+          } else if (o.k === 'drop') {
+            Object.assign(ch, { mode: 'mat', x: o.x, y: o.y, by: -1 })
+            if (t0 - o.t <= 45) say('The chair is loose again!')
           }
         }
         while (run.elim < elims.length && elims[run.elim].t <= t0) {
@@ -277,6 +332,10 @@ export default function Arena({
         if (!run.milestones.has('bell')) {
           run.milestones.add('bell')
           say(`The bell rings — ${n} managers, one ring, and only one Pick 1.`)
+          if (soundRef.current && run.elapsed < 1500 && !run.belled) {
+            run.belled = true
+            sfxBell()
+          }
         }
         const half = Math.ceil(n / 2)
         if (aliveNow <= half && aliveNow > 3 && !run.milestones.has('half')) {
@@ -314,8 +373,8 @@ export default function Arena({
         run.prevAlive = aliveNow
       }
 
-      const secs = Math.max(0, run.elapsed / 1000)
-      if (run.clockAt < 0 || secs - run.clockAt > 0.2 || aliveNow <= 1) {
+      const secs = run.elapsed / 1000
+      if (run.clockAt < -1e8 || Math.abs(secs - run.clockAt) > 0.2 || aliveNow <= 1) {
         run.clockAt = secs
         cbRef.current.onClock?.(secs, aliveNow)
       }
@@ -493,22 +552,79 @@ export default function Arena({
       }
 
       // ---- fighters ----
+      const introT = run.elapsed + introMs // 0..introMs while the entrances run
+      const inIntro = run.elapsed < 0 && introT >= 0
+      const entranceIdx = inIntro ? Math.floor((introT - INTRO_OPEN) / INTRO_PER) : n
+
       // Split: in the ring (drawn between rope layers) vs out/flying (in front).
       const inRing = []
       const outside = []
-      for (let i = 0; i < n; i++) {
-        const st = at(state, t0, i)
-        const wx = at(px, t0, i) * (1 - a) + at(px, t1, i) * a
-        const wy = at(py, t0, i) * (1 - a) + at(py, t1, i) * a
-        ;(st === 2 ? inRing : outside).push({ i, st, wx, wy })
+      if (inIntro) {
+        // Pre-show cast: everyone who has entered stands on their mark; the
+        // current wrestler walks the aisle from the tunnel to their spot.
+        for (let i = 0; i <= entranceIdx && i < n; i++) {
+          const sx = at(px, 0, i)
+          const sy = at(py, 0, i)
+          if (i < entranceIdx) {
+            inRing.push({ i, st: 2, wx: sx, wy: sy, intro: 'set' })
+            continue
+          }
+          const wp = Math.min(1, (introT - INTRO_OPEN - i * INTRO_PER) / (INTRO_PER * 0.8))
+          const e = wp * wp * (3 - 2 * wp)
+          const wx = 500 + (sx - 500) * e
+          const wy = 30 + (sy - 30) * e
+          inRing.push({ i, st: 2, wx, wy, intro: wp < 1 ? 'walk' : 'set' })
+        }
+      } else if (run.elapsed >= 0) {
+        for (let i = 0; i < n; i++) {
+          const st = at(state, t0, i)
+          const wx = at(px, t0, i) * (1 - a) + at(px, t1, i) * a
+          const wy = at(py, t0, i) * (1 - a) + at(py, t1, i) * a
+          ;(st === 2 ? inRing : outside).push({ i, st, wx, wy })
+        }
       }
+      // Before the entrances begin, the ring stands empty under the lights.
       inRing.sort((p, q) => p.wy - q.wy)
       outside.sort((p, q) => p.wy - q.wy)
 
-      const drawOne = ({ i, st, wx, wy }) => {
+      // Entrance stings + booth intro lines, once per wrestler.
+      if (inIntro && entranceIdx >= 0 && entranceIdx < n && entranceIdx !== run.introIdx) {
+        run.introIdx = entranceIdx
+        const f = fighters[entranceIdx]
+        say(`Here comes ${f.name} — ${f.callsign}!`)
+        if (soundRef.current) sfxEntrance(entranceIdx)
+      }
+
+      const drawOne = ({ i, st, wx, wy, intro }) => {
         const f = fighters[i]
         const [X, Y, d] = proj(wx, wy)
         const u = 3.5 * d
+
+        if (intro) {
+          // Walking the aisle, hopping the ropes at the rope line.
+          const hopZ = intro === 'walk' ? Math.max(0, 30 - Math.abs(wy - RING_MIN)) * 1.1 * d : 0
+          if (intro === 'walk') {
+            // Tunnel spotlight tracks the walker.
+            ctx.beginPath()
+            ctx.moveTo(500 - 30, -20)
+            ctx.lineTo(500 + 30, -20)
+            ctx.lineTo(X + 55 * d, Y + 24 * d)
+            ctx.lineTo(X - 55 * d, Y + 24 * d)
+            ctx.closePath()
+            ctx.fillStyle = 'rgba(255,225,160,0.14)'
+            ctx.fill()
+          }
+          ctx.save()
+          ctx.translate(X, Y + 20 * d)
+          drawShadow(ctx, 17 * d, 5.5 * d)
+          ctx.restore()
+          ctx.save()
+          ctx.translate(X, Y + 20 * d - hopZ)
+          drawWrestler(ctx, f.pal, intro === 'walk' ? 'walk' : 'idle', animFrame + i, 1, u)
+          ctx.restore()
+          outlined(f.short, X, Y + 32 * d, 14, 'rgba(226,233,240,0.92)')
+          return
+        }
 
         if (st === 3 || st === 1) {
           // Flying over the ropes, then flat at ringside.
@@ -582,7 +698,7 @@ export default function Arena({
           ctx.restore()
         }
 
-        if (!finished) {
+        if (!finished && run.elapsed >= 0) {
           // Health bar over the head.
           const health = at(hp, t0, i)
           const bw = 36 * d
@@ -594,7 +710,54 @@ export default function Arena({
         outlined(f.short, X, Y + 32 * d, 14, isWinner ? '#ffd88a' : 'rgba(226,233,240,0.92)')
       }
 
+      // The chair on the mat (or sliding in), under the fighters' feet.
+      if (run.chair.mode === 'sliding' || run.chair.mode === 'mat') {
+        const ch = run.chair
+        let cx_ = ch.x
+        let cy_ = ch.y
+        if (ch.mode === 'sliding') {
+          const sp = Math.min(1, (tf - ch.t0) / 16)
+          if (sp >= 1) ch.mode = 'mat'
+          const e = 1 - (1 - sp) * (1 - sp)
+          cx_ = ch.fx + (ch.x - ch.fx) * e
+          cy_ = ch.fy + (ch.y - ch.fy) * e
+        }
+        const [X, Y, d] = proj(cx_, cy_)
+        ctx.save()
+        ctx.translate(X, Y + 14 * d)
+        drawShadow(ctx, 10 * d, 3.5 * d, 0.35)
+        if (!reduced) {
+          // A glint so nobody misses it.
+          ctx.beginPath()
+          ctx.arc(0, -8 * d, (12 + ((now / 90) % 8)) * d, 0, TAU)
+          ctx.strokeStyle = `rgba(226,233,240,${0.35 - ((now / 90) % 8) * 0.04})`
+          ctx.lineWidth = 1.5
+          ctx.stroke()
+        }
+        drawChair(ctx, 3.2 * d)
+        ctx.restore()
+      }
+
       for (const fgt of inRing) drawOne(fgt)
+
+      // The chair in somebody's hands, raised when they swing.
+      if (run.chair.mode === 'held' && run.chair.by >= 0) {
+        const hb = run.chair.by
+        if (at(state, t0, hb) === 2) {
+          const hx = at(px, t0, hb) * (1 - a) + at(px, t1, hb) * a
+          const hy = at(py, t0, hb) * (1 - a) + at(py, t1, hb) * a
+          const [X, Y, d] = proj(hx, hy)
+          const swinging = t0 - run.lastAtk[hb] < 6
+          ctx.save()
+          ctx.translate(
+            X + (swinging ? 14 * d * run.facing[hb] : 11 * d * run.facing[hb]),
+            Y + (swinging ? -46 * d : -20 * d),
+          )
+          ctx.scale(run.facing[hb], 1)
+          drawChair(ctx, 3 * d, true)
+          ctx.restore()
+        }
+      }
 
       // Front rope + front posts over the in-ring action.
       for (const { h, c } of ROPES) rope(CORNERS[3], CORNERS[2], h, c, c === '#ff9d2e')
@@ -649,7 +812,13 @@ export default function Arena({
         ctx.translate(X, Y - (34 + p.life * 30) * d)
         ctx.rotate(p.rot)
         ctx.globalAlpha = p.life > 0.6 ? (1 - p.life) * 2.5 : 1
-        outlined(p.txt, 0, 0, 26 * d, p.life % 0.2 > 0.1 ? '#ffd88a' : '#ff9d2e')
+        outlined(
+          p.txt,
+          0,
+          0,
+          26 * d,
+          p.silver ? '#dbe4ee' : p.life % 0.2 > 0.1 ? '#ffd88a' : '#ff9d2e',
+        )
         ctx.restore()
         ctx.globalAlpha = 1
       }
@@ -758,19 +927,49 @@ export default function Arena({
         ctx.globalAlpha = 1
       }
 
-      // Pre-roll overlay: counting down to the bell, then the bell.
-      if (run.elapsed < 0) {
+      // Pre-show overlays: countdown → tonight card → entrance cards → bell.
+      if (run.elapsed < -introMs) {
+        // Waiting for the show to begin.
         ctx.fillStyle = 'rgba(4,6,10,0.55)'
         ctx.fillRect(0, 0, 1000, VIEW_H)
-        const secLeft = Math.ceil(-run.elapsed / 1000)
+        const secLeft = Math.ceil((-run.elapsed - introMs) / 1000)
         if (secLeft <= 9) {
           outlined(String(secLeft), 500, 330, 96, secLeft <= 3 ? '#ff9d2e' : '#e2e9f0')
-          if (clockRef.current) outlined('THE BELL IS ABOUT TO RING', 500, 410, 22, '#8ea0b4')
+          outlined('THE SHOW IS ABOUT TO BEGIN', 500, 410, 22, '#8ea0b4')
         } else {
           outlined('READY…', 500, 340, 56, '#8ea0b4')
         }
-      } else if (run.elapsed < 700) {
+      } else if (inIntro && introT < INTRO_OPEN) {
+        // Tonight's card.
+        const k = introT / INTRO_OPEN
+        ctx.fillStyle = 'rgba(4,6,10,0.6)'
+        ctx.fillRect(0, 0, 1000, VIEW_H)
+        ctx.globalAlpha = k > 0.85 ? (1 - k) * 6.7 : Math.min(1, k * 5)
+        outlined('TONIGHT', 500, 250, 22, '#8ea0b4')
+        outlined((league || 'DRAFT FIGHT').toUpperCase(), 500, 320, 52, '#ff9d2e')
+        outlined(`${n} MANAGERS · ONE RING · ONE PICK 1`, 500, 388, 22, '#e2e9f0')
+        ctx.globalAlpha = 1
+      } else if (inIntro && entranceIdx >= 0 && entranceIdx < n) {
+        // The walker's lower-third.
+        const f = fighters[entranceIdx]
+        ctx.fillStyle = 'rgba(5,8,12,0.85)'
+        ctx.fillRect(0, VIEW_H - 122, 1000, 100)
+        ctx.fillStyle = f.color
+        ctx.fillRect(0, VIEW_H - 122, 1000, 4)
+        outlined(f.callsign, 500, VIEW_H - 88, 34, f.color)
+        outlined(`${f.name.toUpperCase()} · #${f.number}`, 500, VIEW_H - 54, 18, '#e2e9f0')
+        outlined(`SIGNATURE: ${f.move}`, 500, VIEW_H - 30, 14, '#8ea0b4')
+      } else if (run.elapsed >= 0 && run.elapsed < 700) {
         outlined('FIGHT!', 500, 340, 84, '#ff9d2e')
+      }
+
+      // The tunnel: a lit gap in the crowd wall while the entrances run.
+      if (inIntro) {
+        const g = ctx.createRadialGradient(500, 26, 4, 500, 26, 90)
+        g.addColorStop(0, 'rgba(255,235,190,0.5)')
+        g.addColorStop(1, 'rgba(255,235,190,0)')
+        ctx.fillStyle = g
+        ctx.fillRect(392, -20, 216, 150)
       }
 
       // Screen dressing, in device pixels so the lines stay crisp.
@@ -796,6 +995,7 @@ export default function Arena({
     return () => {
       cancelAnimationFrame(raf)
       ro.disconnect()
+      if (ctlRef) ctlRef.current = null
     }
   }, [fight, fighters, runKey])
 

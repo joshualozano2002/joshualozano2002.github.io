@@ -17,6 +17,27 @@ export function drawShadow(ctx, rx, ry, alpha = 0.4) {
   ctx.fill()
 }
 
+/** A folding steel chair, ringside's favourite equalizer. */
+export function drawChair(ctx, u = 3, held = false) {
+  ctx.save()
+  const r = (x, y, w, h, c) => {
+    ctx.fillStyle = c
+    ctx.fillRect(x * u, y * u, w * u, h * u)
+  }
+  if (held) {
+    // Raised overhead, seen edge-on.
+    r(-3.2, -1.2, 6.4, 1.3, '#aeb9c6')
+    r(-3.2, -2.6, 1.1, 1.5, '#8792a1')
+    r(2.1, -2.6, 1.1, 1.5, '#8792a1')
+  } else {
+    r(-2.6, -6.2, 5.2, 3.4, '#aeb9c6') // backrest
+    r(-2.6, -3, 5.2, 1.1, '#8792a1') // seat
+    r(-2.4, -1.9, 0.9, 1.9, '#6b7684') // legs
+    r(1.5, -1.9, 0.9, 1.9, '#6b7684')
+  }
+  ctx.restore()
+}
+
 /**
  * @param pose 'idle' | 'walk' | 'punch' | 'hurt' | 'win' | 'ko'
  * @param frame integer animation clock; only its parity matters

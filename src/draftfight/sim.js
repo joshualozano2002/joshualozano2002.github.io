@@ -56,6 +56,23 @@ const ramp = (t) => {
 export function simulate(seed, n) {
   const rng = makeRng(`${seed}:fight`)
 
+  // The steel chair. Its schedule and placement come from a separate stream,
+  // drawn entirely up front, so the main combat stream is never disturbed.
+  const objRng = makeRng(`${seed}:objects`)
+  const chairPlan = [
+    { at: Math.floor(520 + objRng() * 440), ang: objRng(), rad: 95 + objRng() * 65 },
+    { at: Math.floor(1200 + objRng() * 400), ang: objRng(), rad: 95 + objRng() * 65 },
+  ]
+  const objects = [] // renderer + booth event feed
+  let chairPlanIdx = 0
+  // -1 none · -2 destroyed for now · >=0 held by that fighter · 'mat' via chairOnMat
+  let chairHolder = -1
+  let chairOnMat = false
+  let chairX = 0
+  let chairY = 0
+  let chairSwings = 0
+  let chairLandT = 0 // pickup waits for the slide-in to finish
+
   const px = new Float32Array(MAX_TICKS * n)
   const py = new Float32Array(MAX_TICKS * n)
   const php = new Float32Array(MAX_TICKS * n)
@@ -92,6 +109,7 @@ export function simulate(seed, n) {
   const sTaken = new Float64Array(n)
   const sKos = new Int32Array(n)
   const sHits = new Int32Array(n)
+  const sChair = new Float64Array(n)
   const sOut = new Int32Array(n).fill(-1)
 
   // Which manager stands where is drawn, not derived from list position.
@@ -138,6 +156,82 @@ export function simulate(seed, n) {
     if (alive <= 1) {
       outro++
       if (outro > OUTRO_TICKS) break
+    }
+
+    // Slide a chair in on schedule — near the action, so somebody trips over
+    // it soon. Position comes from the live centroid plus a pre-drawn offset.
+    if (
+      chairPlanIdx < chairPlan.length &&
+      t >= chairPlan[chairPlanIdx].at &&
+      chairHolder < 0 &&
+      !chairOnMat &&
+      alive > 3
+    ) {
+      const plan = chairPlan[chairPlanIdx++]
+      let mx = 0
+      let my = 0
+      let mc = 0
+      for (let i = 0; i < n; i++) {
+        if (state[i] !== 2) continue
+        mx += x[i]
+        my += y[i]
+        mc++
+      }
+      mx /= mc
+      my /= mc
+      // A point on the unit circle from one uniform draw, no trig: pick a
+      // side by quadrant and spread along it. Exact arithmetic only.
+      const u = plan.ang * 4
+      const q = Math.floor(u)
+      const f = (u - q) * 2 - 1
+      const d = 1 + f * f
+      const ux = q % 2 === 0 ? (1 - f * f) / d : (2 * f) / d
+      const uy = q % 2 === 0 ? (2 * f) / d : (1 - f * f) / d
+      chairX = mx + ux * plan.rad * (q < 2 ? 1 : -1)
+      chairY = my + uy * plan.rad * (q < 2 ? 1 : -1)
+      if (chairX < LO + 20) chairX = LO + 20
+      if (chairX > HI - 20) chairX = HI - 20
+      if (chairY < LO + 20) chairY = LO + 20
+      if (chairY > HI - 20) chairY = HI - 20
+      chairOnMat = true
+      // Where it slid in from: the nearest rope edge.
+      const edges = [
+        [chairX, RING_MIN - 60],
+        [chairX, RING_MAX + 60],
+        [RING_MIN - 60, chairY],
+        [RING_MAX + 60, chairY],
+      ]
+      let ei = 0
+      let ed = Infinity
+      for (let k = 0; k < 4; k++) {
+        const dx = edges[k][0] - chairX
+        const dy = edges[k][1] - chairY
+        const dd = dx * dx + dy * dy
+        if (dd < ed) {
+          ed = dd
+          ei = k
+        }
+      }
+      chairLandT = t + 16
+      objects.push({ k: 'spawn', t, x: chairX, y: chairY, fx: edges[ei][0], fy: edges[ei][1] })
+    }
+
+    // First fighter to reach a loose chair takes it. Checked in the drawn
+    // order, so no roster slot gets first grab.
+    if (chairOnMat && t >= chairLandT) {
+      for (let q = 0; q < n; q++) {
+        const i = ord[q]
+        if (state[i] !== 2) continue
+        const dx = x[i] - chairX
+        const dy = y[i] - chairY
+        if (dx * dx + dy * dy < 42 * 42) {
+          chairOnMat = false
+          chairHolder = i
+          chairSwings = 5
+          objects.push({ k: 'pick', t, by: i })
+          break
+        }
+      }
     }
 
     // Down to the final pairs the crowd wants an ending, not a stamina duel.
@@ -195,12 +289,21 @@ export function simulate(seed, n) {
         cool[i] -= 1
         if (dist < REACH && cool[i] <= 0) {
           const roll = 0.85 + rng() * 1.5
-          const dmg = roll * power[i] * dmgMul
+          const chair = chairHolder === i
+          const dmg = roll * power[i] * dmgMul * (chair ? 2.2 : 1)
           hp[tg] -= dmg
           lastHitBy[tg] = i
           sDmg[i] += dmg
           sTaken[tg] += dmg
           sHits[i]++
+          if (chair) {
+            sChair[i] += dmg
+            chairSwings--
+            if (chairSwings <= 0) {
+              chairHolder = -2
+              objects.push({ k: 'break', t, by: i, on: tg })
+            }
+          }
           // A top-of-the-range roll, not too soon after the last one, is this
           // fighter's signature move. Derived from the roll, so it costs no rng.
           const special =
@@ -223,6 +326,7 @@ export function simulate(seed, n) {
             a: i,
             d: tg,
             s: special,
+            c: chair,
           })
         }
       }
@@ -239,6 +343,18 @@ export function simulate(seed, n) {
           const w = (speed[i] * 0.17 * (bd / 310)) / bd
           x[i] += bx * w
           y[i] += by * w
+        }
+      }
+
+      // A loose chair is irresistible: anyone close by drifts toward it.
+      if (chairOnMat && t >= chairLandT) {
+        const dxr = chairX - x[i]
+        const dyr = chairY - y[i]
+        const dr = Math.sqrt(dxr * dxr + dyr * dyr)
+        if (dr > 0.001 && dr < 150) {
+          const w = (speed[i] * 0.6) / dr
+          x[i] += dxr * w
+          y[i] += dyr * w
         }
       }
 
@@ -313,6 +429,13 @@ export function simulate(seed, n) {
 
       sOut[i] = t
       if (lastHitBy[i] >= 0) sKos[lastHitBy[i]]++
+      if (chairHolder === i) {
+        chairHolder = -1
+        chairOnMat = true
+        chairX = Math.min(HI - 20, Math.max(LO + 20, x[i]))
+        chairY = Math.min(HI - 20, Math.max(LO + 20, y[i]))
+        objects.push({ k: 'drop', t, x: chairX, y: chairY })
+      }
 
       order.push(i)
       elims.push({ t, id: i, x: x[i], y: y[i], pick: alive + 1, by: lastHitBy[i] })
@@ -338,6 +461,7 @@ export function simulate(seed, n) {
     taken: Math.round(sTaken[i]),
     kos: sKos[i],
     hits: sHits[i],
+    chair: Math.round(sChair[i]),
     survived: sOut[i] < 0 ? ticks : sOut[i],
   }))
 
@@ -357,6 +481,7 @@ export function simulate(seed, n) {
     koTick,
     pickOf,
     stats,
+    objects,
     hits,
     elims,
     order: picks,

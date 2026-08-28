@@ -102,6 +102,24 @@ export const sfxChant = () => {
   sfxRoar(0.4)
 }
 
+/** One wrestler's entrance sting — a two-note horn, pitched per fighter. */
+export const sfxEntrance = (variant = 0) => {
+  const root = 196 * Math.pow(1.0594631, variant % 12) // chromatic walk, per fighter
+  blip({ freq: root, dur: 0.22, type: 'sawtooth', gain: 0.06 })
+  blip({ freq: root * 1.5, dur: 0.34, type: 'sawtooth', gain: 0.06, delay: 0.18 })
+  noise({ dur: 0.5, gain: 0.03, freq: 700, attack: 0.08, delay: 0.05 })
+}
+
+/** Steel on skull. Bigger when the chair gives out. */
+export const sfxChair = (breaking = false) => {
+  blip({ freq: 1150, to: 240, dur: 0.11, type: 'square', gain: 0.08 })
+  noise({ dur: 0.09, gain: 0.07, freq: 2400, type: 'highpass' })
+  if (breaking) {
+    blip({ freq: 620, to: 90, dur: 0.3, type: 'sawtooth', gain: 0.07, delay: 0.05 })
+    sfxRoar(0.7)
+  }
+}
+
 /** The bell that starts it. */
 export const sfxBell = () => {
   ;[0, 0.28, 0.56].forEach((d) => {

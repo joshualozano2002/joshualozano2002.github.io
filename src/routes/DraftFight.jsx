@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Seo from '../components/Seo'
 import { Label, Lamp } from '../components/ui'
-import Arena from '../draftfight/Arena'
+import Arena, { introDurationMs } from '../draftfight/Arena'
 import { drawWrestler } from '../draftfight/sprite'
 import { MAX_MANAGERS, MIN_MANAGERS, fightHash, readHash } from '../draftfight/codec'
 import { buildFighters } from '../draftfight/roster'
 import { simulate } from '../draftfight/sim'
 import { newSeed } from '../draftfight/rng'
 import { sharedNow, syncClock } from '../draftfight/clock'
-import { primeAudio, sfxBell } from '../draftfight/sound'
+import { primeAudio } from '../draftfight/sound'
 
 const SIZES = Array.from({ length: MAX_MANAGERS - MIN_MANAGERS + 1 }, (_, i) => MIN_MANAGERS + i)
 const clock = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(Math.floor(s % 60)).padStart(2, '0')}`
@@ -375,9 +375,10 @@ export default function DraftFight() {
     setRunKey((k) => k + 1)
   }, [])
 
+  const arenaCtl = useRef(null)
+
   const start = () => {
     primeAudio()
-    if (sound) sfxBell()
     if (spec.startAt) setReplay(true) // the event aired; this showing is a replay
     setRevealed({})
     setFeed([])
@@ -431,6 +432,7 @@ export default function DraftFight() {
   useEffect(() => {
     if (!spec?.startAt || !fight || replay) return
     const sinceBell = sharedNow() - spec.startAt
+    const preShow = introDurationMs(spec.managers.length) + 2000
     if (sinceBell > fight.durationMs + 2000) {
       const all = {}
       fight.order.forEach((id, i) => {
@@ -439,7 +441,7 @@ export default function DraftFight() {
       setRevealed(all)
       setPlaying(false)
       setPhase('done')
-    } else if (sinceBell > -8000) {
+    } else if (sinceBell > -preShow) {
       setPhase('live')
     }
   }, [spec, fight, replay])
@@ -449,18 +451,13 @@ export default function DraftFight() {
     if (!spec?.startAt || replay || phase === 'done') return
     const id = setInterval(() => {
       setTick((t) => t + 1)
-      if (spec.startAt - sharedNow() <= 8000) {
+      if (spec.startAt - sharedNow() <= introDurationMs(spec.managers.length) + 2000) {
         setPhase((p) => (p === 'lobby' ? 'live' : p))
       }
     }, 250)
     return () => clearInterval(id)
   }, [spec, replay, phase])
 
-  // Ring the bell audibly when a live fight starts itself.
-  useEffect(() => {
-    if (phase === 'live' && isLive && sound) sfxBell()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
 
   // Each stage is a different page, but the router only scrolls on a real
   // route change — without this you submit the roster and land halfway down
@@ -494,6 +491,13 @@ export default function DraftFight() {
       { title: 'IRON CHIN', id: top('taken'), detail: `${st[top('taken')].taken} damage eaten` },
       { title: 'GLASS JAW', id: fight.order[fight.order.length - 1], detail: 'first one out' },
     ]
+    const hc = top('chair')
+    if (st[hc].chair > 0)
+      out.push({
+        title: 'HARDCORE',
+        id: hc,
+        detail: `${st[hc].chair} chair damage`,
+      })
     const ex = top('kos')
     if (fight.stats[ex].kos > 0)
       out.splice(1, 0, {
@@ -656,9 +660,10 @@ export default function DraftFight() {
                         {countdownText(spec.startAt - sharedNow())}
                       </p>
                       <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-mute">
-                        The fight starts here, by itself, for everyone at once. Nobody can watch it
-                        early — you included. Anyone who tunes in late joins the fight already in
-                        progress.
+                        Wrestler entrances begin about{' '}
+                        {Math.round(introDurationMs(n) / 1000)} seconds before the bell, right here,
+                        by themselves, for everyone at once. Nobody can watch early — you included.
+                        Tune in late and you join the fight already in progress.
                       </p>
                     </div>
                   ) : null}
@@ -703,9 +708,15 @@ export default function DraftFight() {
                   <div>
                     <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                       <div className="flex items-center gap-5">
-                        <span className="readout text-sm text-amber">{clock(hud.secs)}</span>
+                        <span className="readout text-sm text-amber">
+                          {clock(Math.max(0, hud.secs))}
+                        </span>
                         <span className="label">
-                          {phase === 'done' ? 'Fight over' : `${hud.alive} standing`}
+                          {phase === 'done'
+                            ? 'Fight over'
+                            : hud.secs < 0
+                              ? 'Entrances'
+                              : `${hud.alive} standing`}
                         </span>
                       </div>
                       {phase === 'live' && isLive ? (
@@ -759,6 +770,15 @@ export default function DraftFight() {
                           >
                             {sound ? 'SOUND ON' : 'SOUND OFF'}
                           </button>
+                          {hud.secs < -2 ? (
+                            <button
+                              type="button"
+                              onClick={() => arenaCtl.current?.skipIntro()}
+                              className="readout rounded-xs border border-hairline px-3 py-1.5 text-[10px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
+                            >
+                              SKIP ENTRANCES
+                            </button>
+                          ) : null}
                           <button
                             type="button"
                             onClick={skip}
@@ -779,6 +799,8 @@ export default function DraftFight() {
                         sound={sound}
                         runKey={runKey}
                         clock={isLive ? liveClock : undefined}
+                        league={spec.league}
+                        ctlRef={arenaCtl}
                         onElim={onElim}
                         onTicker={onTicker}
                         onClock={onClock}
