@@ -41,7 +41,7 @@ const ramp = (t) => {
   const over = t - TICK_HZ * 72
   if (over <= 0) return 1
   const r = 1 + over / (TICK_HZ * 30)
-  return r > 4 ? 4 : r
+  return r > 5 ? 5 : r
 }
 
 /**
@@ -137,6 +137,10 @@ export function simulate(seed, n) {
   const sHits = new Int32Array(n)
   const sChair = new Float64Array(n)
   const sOut = new Int32Array(n).fill(-1)
+  const hangUsed = new Uint8Array(n)
+  const saves = [] // once-per-fighter cheat-death moments
+  const pairDmg = new Float64Array(n * n)
+  let feudEvent = null
 
   for (let i = 0; i < n; i++) {
     // Later entrants wait backstage at the tunnel; the opening pair squares up.
@@ -162,6 +166,7 @@ export function simulate(seed, n) {
 
   let alive = 2
   let entered = 2
+  let fullHealDone = false
   let ticks = 0
   let outro = 0
 
@@ -183,6 +188,16 @@ export function simulate(seed, n) {
         y[i] = LO + 10
         alive++
         entered++
+      }
+    }
+
+    // The moment the field is complete, every survivor digs deep: wear from
+    // the entry phase is largely wiped, so the endgame is decided by the
+    // fight in front of everyone, not by who happened to enter last.
+    if (entered === n && !fullHealDone) {
+      fullHealDone = true
+      for (let j = 0; j < n; j++) {
+        if (state[j] === 2 && hp[j] < hpMax[j] * 0.85) hp[j] = hpMax[j] * 0.85
       }
     }
 
@@ -324,14 +339,21 @@ export function simulate(seed, n) {
         if (dist < REACH && cool[i] <= 0) {
           const roll = 0.62 + rng() * 0.62
           const chair = chairHolder === i
-          // A crowded ring spreads the punishment thin: total elimination pace
-          // stays steady as the ring fills, so the rumble builds instead of
-          // collapsing in waves. Solo showdowns still hit at full force.
-          const crowd = alive > 2 ? Math.min(1, 1.35 / alive) : 1
+          // A crowded ring spreads the punishment thin while entries are still
+          // coming — the rumble builds instead of collapsing in waves — then
+          // the brakes come off once the field is complete and the endgame
+          // belongs to the fighting. Solo showdowns always hit at full force.
+          const crowd = alive > 2 ? Math.min(1, (entered < n ? 1.05 : 2.1) / alive) : 1
           const dmg = roll * power[i] * dmgMul * crowd * (chair ? 2.2 : 1)
           hp[tg] -= dmg
           lastHitBy[tg] = i
           lastHurtT[tg] = t
+          {
+            const lo = i < tg ? i : tg
+            const hi = i < tg ? tg : i
+            pairDmg[lo * n + hi] += dmg
+            if (!feudEvent && pairDmg[lo * n + hi] > 60) feudEvent = { t, a: lo, b: hi }
+          }
           sDmg[i] += dmg
           sTaken[tg] += dmg
           sHits[i]++
@@ -461,6 +483,16 @@ export function simulate(seed, n) {
       const i = ord[q]
       if (state[i] !== 2 || hp[i] > 0) continue
       if (alive <= 1) break
+
+      // Everyone gets one miracle: the first time you'd go over the ropes
+      // (outside the final duel), you hang on by your fingertips instead.
+      // Symmetric, so it favours nobody — it just makes near-death a story.
+      if (!hangUsed[i] && alive > 2 && !forceEnd) {
+        hangUsed[i] = 1
+        hp[i] = hpMax[i] * 0.06
+        saves.push({ t, id: i })
+        continue
+      }
       hp[i] = 0
       state[i] = 1
       koTick[i] = t
@@ -539,6 +571,21 @@ export function simulate(seed, n) {
     entryOrder,
     lastEntryT,
     stats,
+    saves,
+    feudEvent,
+    feud: (() => {
+      let best = 0
+      let a = -1
+      let b = -1
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++)
+          if (pairDmg[i * n + j] > best) {
+            best = pairDmg[i * n + j]
+            a = i
+            b = j
+          }
+      return a >= 0 ? { a, b, dmg: Math.round(best) } : null
+    })(),
     objects,
     hits,
     elims,

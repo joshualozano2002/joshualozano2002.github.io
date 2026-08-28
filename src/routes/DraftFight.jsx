@@ -533,6 +533,12 @@ export default function DraftFight() {
         id: hc,
         detail: `${st[hc].chair} chair damage`,
       })
+    if (fight.feud && fight.feud.dmg > 45 && fighters)
+      out.push({
+        title: 'BLOOD FEUD',
+        id: fight.feud.a,
+        detail: `vs ${fighters[fight.feud.b].name} · ${fight.feud.dmg} dmg traded`,
+      })
     const ex = top('kos')
     if (fight.stats[ex].kos > 0)
       out.splice(1, 0, {

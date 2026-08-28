@@ -119,7 +119,7 @@ export default function Arena({
 
     const {
       n, ticks, px, py, hp, state, koTick, pickOf, hits, elims, objects, winner,
-      entries, entryOrder, lastEntryT,
+      entries, entryOrder, lastEntryT, saves, feudEvent,
     } = fight
     const introMs = introDurationMs()
     const durMs = fight.durationMs
@@ -157,6 +157,10 @@ export default function Arena({
       milestones: new Set(),
       introIdx: -2, // which pre-show entrance is on, -2 before any
       arrived: new Set(), // rumble entries already announced
+      save: 0, // pointer into the hang-on feed
+      feudSaid: false,
+      streak: new Array(n).fill(0), // consecutive hits landed without taking one
+      onFire: new Array(n).fill(false),
       obj: 0, // pointer into the chair event feed
       chair: { mode: 'none', x: 0, y: 0, fx: 0, fy: 0, t0: 0, by: -1 },
       belled: false,
@@ -269,6 +273,13 @@ export default function Arena({
           run.lastDef[h.d] = h.t
           run.faceX[h.a] = h.x
           run.faceX[h.d] = h.x
+          run.streak[h.a]++
+          run.streak[h.d] = 0
+          if (run.onFire[h.d]) run.onFire[h.d] = false
+          if (run.streak[h.a] === 5 && !run.onFire[h.a]) {
+            run.onFire[h.a] = true
+            if (t0 - h.t <= 45) say(`${fighters[h.a].name} is ON FIRE!`)
+          }
           if (t0 - h.t <= 8) {
             run.sparks.push({ x: h.x, y: h.y, life: 0, p: Math.min(h.p, 1.4) })
             if (h.s) {
@@ -323,6 +334,23 @@ export default function Arena({
             Object.assign(ch, { mode: 'mat', x: o.x, y: o.y, by: -1 })
             if (t0 - o.t <= 45) say('The chair is loose again!')
           }
+        }
+        while (run.save < saves.length && saves[run.save].t <= t0) {
+          const sv = saves[run.save++]
+          if (t0 - sv.t <= 45) {
+            const f = fighters[sv.id]
+            run.special = { at: now, text: `${f.short} HANGS ON!`, color: f.color }
+            run.shake = 16
+            if (soundRef.current) sfxRoar(0.9)
+            say(`${f.name} was GONE — and somehow hangs on by the fingertips!`)
+          }
+        }
+        if (feudEvent && !run.feudSaid && feudEvent.t <= t0) {
+          run.feudSaid = true
+          if (t0 - feudEvent.t <= 60)
+            say(
+              `${fighters[feudEvent.a].name} and ${fighters[feudEvent.b].name} just cannot leave each other alone. That's a feud.`,
+            )
         }
         while (run.elim < elims.length && elims[run.elim].t <= t0) {
           const e = elims[run.elim++]
@@ -419,7 +447,16 @@ export default function Arena({
         const half = Math.ceil(n / 2)
         if (run.elim >= half && !run.milestones.has('half')) {
           run.milestones.add('half')
-          say(`Half the picks are settled — ${n - run.elim} managers still alive.`)
+          let iron = -1
+          for (let i = 0; i < n; i++)
+            if (at(state, t0, i) === 2 && (iron < 0 || fight.entryTick[i] < fight.entryTick[iron]))
+              iron = i
+          say(
+            `Half the picks are settled — ${n - run.elim} alive.` +
+              (iron >= 0 && fight.entryTick[iron] === 0
+                ? ` And ${fighters[iron].name} has been in there since the opening bell.`
+                : ''),
+          )
         }
         if (enteredAll && aliveNow === 3 && !run.milestones.has('three')) {
           run.milestones.add('three')
@@ -827,6 +864,15 @@ export default function Arena({
             u,
           )
           ctx.restore()
+        }
+
+        if (run.onFire[i] && st === 2 && !finished) {
+          // Riding a streak: a lick of flame over the head.
+          const fl = animFrame + i
+          ctx.fillStyle = fl % 2 ? '#ff9d2e' : '#ffd88a'
+          ctx.fillRect(X - 4 * d, Y - (74 + (fl % 3)) * d, 8 * d, 9 * d)
+          ctx.fillStyle = '#ff5a4d'
+          ctx.fillRect(X - 2 * d, Y - (68 + (fl % 2)) * d, 4 * d, 5 * d)
         }
 
         if (!finished && run.elapsed >= 0) {
