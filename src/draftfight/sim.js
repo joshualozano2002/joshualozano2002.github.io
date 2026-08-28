@@ -83,6 +83,17 @@ export function simulate(seed, n) {
   const flyX1 = new Float64Array(n)
   const flyY1 = new Float64Array(n)
 
+  // Fight-story bookkeeping. Pure observation of the existing stream — none of
+  // this may draw from rng, or every previously shared link changes its result.
+  const lastHitBy = new Int32Array(n).fill(-1)
+  const lastSpec = new Int32Array(n).fill(-9999)
+  let lastSpecAny = -9999 // signature moves are a moment; keep them scarce globally
+  const sDmg = new Float64Array(n)
+  const sTaken = new Float64Array(n)
+  const sKos = new Int32Array(n)
+  const sHits = new Int32Array(n)
+  const sOut = new Int32Array(n).fill(-1)
+
   // Which manager stands where is drawn, not derived from list position.
   // Spawning next to a crowd is a real disadvantage, so tying it to roster
   // order would quietly punish whoever the commissioner typed in first.
@@ -130,7 +141,7 @@ export function simulate(seed, n) {
     }
 
     // Down to the final pairs the crowd wants an ending, not a stamina duel.
-    const dmgMul = ramp(t) * (alive <= 2 ? 1.4 : alive <= 3 ? 1.15 : 1)
+    const dmgMul = ramp(t) * (alive <= 2 ? 1.3 : alive <= 3 ? 1.05 : 1)
     const forceEnd = t > MAX_TICKS - 150
 
     for (let q = 0; q < n; q++) {
@@ -183,8 +194,21 @@ export function simulate(seed, n) {
 
         cool[i] -= 1
         if (dist < REACH && cool[i] <= 0) {
-          const dmg = (0.85 + rng() * 1.5) * power[i] * dmgMul
+          const roll = 0.85 + rng() * 1.5
+          const dmg = roll * power[i] * dmgMul
           hp[tg] -= dmg
+          lastHitBy[tg] = i
+          sDmg[i] += dmg
+          sTaken[tg] += dmg
+          sHits[i]++
+          // A top-of-the-range roll, not too soon after the last one, is this
+          // fighter's signature move. Derived from the roll, so it costs no rng.
+          const special =
+            roll > 2.24 && t - lastSpec[i] > TICK_HZ * 14 && t - lastSpecAny > TICK_HZ * 6
+          if (special) {
+            lastSpec[i] = t
+            lastSpecAny = t
+          }
           cool[i] = 11 + rng() * 16
           const kb = dist > 0.001 ? 3.6 * power[i] / dist : 0
           ix[tg] += dx * kb
@@ -198,6 +222,7 @@ export function simulate(seed, n) {
             p: dmg / 14,
             a: i,
             d: tg,
+            s: special,
           })
         }
       }
@@ -286,8 +311,20 @@ export function simulate(seed, n) {
       flyX1[i] = 165 + (670 * slot) / (n - 2 || 1) + (rng() - 0.5) * 22
       flyY1[i] = 896 + rng() * 26
 
+      sOut[i] = t
+      if (lastHitBy[i] >= 0) sKos[lastHitBy[i]]++
+
       order.push(i)
-      elims.push({ t, id: i, x: x[i], y: y[i], pick: alive + 1 })
+      elims.push({ t, id: i, x: x[i], y: y[i], pick: alive + 1, by: lastHitBy[i] })
+
+      // Down to the final two, both fighters find a second wind. Symmetric, so
+      // it favours no one — it just guarantees the showdown is a real fight
+      // instead of a formality against someone already out on their feet.
+      if (alive === 2) {
+        for (let j = 0; j < n; j++) {
+          if (state[j] === 2 && hp[j] < hpMax[j] * 0.38) hp[j] = hpMax[j] * 0.38
+        }
+      }
     }
   }
 
@@ -295,6 +332,14 @@ export function simulate(seed, n) {
   let winner = -1
   for (let i = 0; i < n; i++) if (state[i] === 2) winner = i
   if (winner < 0) winner = order.length ? order[order.length - 1] : 0
+
+  const stats = Array.from({ length: n }, (_, i) => ({
+    dmg: Math.round(sDmg[i]),
+    taken: Math.round(sTaken[i]),
+    kos: sKos[i],
+    hits: sHits[i],
+    survived: sOut[i] < 0 ? ticks : sOut[i],
+  }))
 
   const picks = [winner, ...order.slice().reverse().filter((id) => id !== winner)]
   const pickOf = new Int32Array(n)
@@ -311,6 +356,7 @@ export function simulate(seed, n) {
     state: pstate.subarray(0, ticks * n),
     koTick,
     pickOf,
+    stats,
     hits,
     elims,
     order: picks,

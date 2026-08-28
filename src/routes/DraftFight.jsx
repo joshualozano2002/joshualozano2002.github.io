@@ -319,6 +319,9 @@ export default function DraftFight() {
   const [href, setHref] = useState('')
   const [replay, setReplay] = useState(false) // aired live fight, watched again
   const [, setTick] = useState(0) // re-render pulse for the countdown
+  const [feed, setFeed] = useState([]) // broadcast-booth lines, newest first
+  const feedId = useRef(0)
+  const [myCall, setMyCall] = useState(null) // this viewer's winner prediction
 
   // One shared clock for everyone watching a scheduled fight.
   useEffect(() => {
@@ -334,6 +337,7 @@ export default function DraftFight() {
         setPhase('lobby')
         setRevealed({})
         setReplay(false)
+        setFeed([])
         setHud({ secs: 0, alive: parsed.managers.length })
         setHref(window.location.href)
       } else {
@@ -364,6 +368,7 @@ export default function DraftFight() {
     setSpec(next)
     setRevealed({})
     setReplay(false)
+    setFeed([])
     setPhase('lobby')
     setPlaying(false)
     setSpeed(1)
@@ -375,6 +380,7 @@ export default function DraftFight() {
     if (sound) sfxBell()
     if (spec.startAt) setReplay(true) // the event aired; this showing is a replay
     setRevealed({})
+    setFeed([])
     setHud({ secs: 0, alive: spec.managers.length })
     setRunKey((k) => k + 1)
     setPhase('live')
@@ -392,6 +398,30 @@ export default function DraftFight() {
   }, [fight])
 
   const onClock = useCallback((secs, alive) => setHud({ secs, alive }), [])
+
+  const onTicker = useCallback((text) => {
+    setFeed((f) => [{ id: feedId.current++, text }, ...f].slice(0, 3))
+  }, [])
+
+  // Call your shot: this viewer's private prediction, kept on this device only.
+  const callKey = spec ? `df-call-${spec.seed}` : null
+  useEffect(() => {
+    if (!callKey) return
+    try {
+      const v = localStorage.getItem(callKey)
+      setMyCall(v === null ? null : Number(v))
+    } catch {
+      setMyCall(null)
+    }
+  }, [callKey])
+  const callShot = (id) => {
+    setMyCall(id)
+    try {
+      localStorage.setItem(callKey, String(id))
+    } catch {
+      /* private mode: the pick just won't survive a reload */
+    }
+  }
 
   /** Broadcast position: ms since the bell, on the skew-corrected clock. */
   const liveClock = useCallback(() => sharedNow() - spec.startAt, [spec])
@@ -449,6 +479,30 @@ export default function DraftFight() {
     setPlaying(false)
     setPhase('done')
   }
+
+  /** Post-fight hardware, straight from the stat sheet. */
+  const awards = useMemo(() => {
+    if (!fight?.stats) return []
+    const st = fight.stats
+    const top = (key, tie = 'dmg') =>
+      st.reduce((b, x, i) => {
+        const bv = st[b]
+        return x[key] > bv[key] || (x[key] === bv[key] && x[tie] > bv[tie]) ? i : b
+      }, 0)
+    const out = [
+      { title: 'MOST VIOLENT', id: top('dmg'), detail: `${st[top('dmg')].dmg} damage dealt` },
+      { title: 'IRON CHIN', id: top('taken'), detail: `${st[top('taken')].taken} damage eaten` },
+      { title: 'GLASS JAW', id: fight.order[fight.order.length - 1], detail: 'first one out' },
+    ]
+    const ex = top('kos')
+    if (fight.stats[ex].kos > 0)
+      out.splice(1, 0, {
+        title: 'THE EXECUTIONER',
+        id: ex,
+        detail: `${st[ex].kos} elimination${st[ex].kos > 1 ? 's' : ''}`,
+      })
+    return out
+  }, [fight])
 
   const resultText = useMemo(() => {
     if (!spec || !fight || !fighters) return ''
@@ -553,6 +607,43 @@ export default function DraftFight() {
                         </li>
                       ))}
                     </ul>
+                  </div>
+
+                  <div className="panel mt-8 p-5">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <Label className="text-amber">Call your shot</Label>
+                      <span className="readout text-[10px] text-mute">
+                        private · stays on this device
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-mute">
+                      Who takes Pick 1? Lock it in before the bell and see how your read holds up.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-1.5">
+                      {fighters.map((f) => (
+                        <button
+                          key={f.id}
+                          type="button"
+                          onClick={() => callShot(f.id)}
+                          aria-pressed={myCall === f.id}
+                          className={`readout rounded-xs border px-2.5 py-1.5 text-[11px] transition-colors ${
+                            myCall === f.id
+                              ? 'border-amber bg-amber/10 text-amber'
+                              : 'border-hairline text-dim hover:border-hairline-hot hover:text-ink'
+                          }`}
+                        >
+                          {f.name}
+                        </button>
+                      ))}
+                    </div>
+                    {myCall !== null && fighters[myCall] ? (
+                      <p className="readout mt-3 text-[11px] text-dim">
+                        You're riding with{' '}
+                        <span style={{ color: fighters[myCall].color }}>
+                          {fighters[myCall].name} · {fighters[myCall].callsign}
+                        </span>
+                      </p>
+                    ) : null}
                   </div>
 
                   {isLive ? (
@@ -689,10 +780,33 @@ export default function DraftFight() {
                         runKey={runKey}
                         clock={isLive ? liveClock : undefined}
                         onElim={onElim}
+                        onTicker={onTicker}
                         onClock={onClock}
                         onEnd={onEnd}
                       />
-                    ) : (
+                    ) : null}
+                    {phase === 'live' && feed.length > 0 ? (
+                      <div className="mt-3 rounded-xs border border-hairline bg-panel/80 px-4 py-2.5">
+                        <div className="flex items-baseline gap-3">
+                          <span className="readout shrink-0 text-[9px] tracking-[0.2em] text-amber">
+                            BOOTH
+                          </span>
+                          <div className="min-w-0">
+                            {feed.map((l, i) => (
+                              <p
+                                key={l.id}
+                                className={`readout truncate text-[11px] leading-5 ${
+                                  i === 0 ? 'text-ink' : 'text-mute'
+                                }`}
+                              >
+                                {l.text}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                    {phase === 'done' ? (
                       <div className="panel p-6 sm:p-8">
                         <div className="flex items-end gap-5">
                           {winner ? <SpriteAvatar fighter={winner} pose="win" size={104} /> : null}
@@ -723,8 +837,101 @@ export default function DraftFight() {
                             ? `This one aired live ${bellText(spec.startAt)} — the whole league saw the same ${n - 1} knockouts at the same moment, and the link replays it for anyone who missed the broadcast.`
                             : `This link always replays this fight. Anyone who thinks you fixed it can open it themselves and watch the same ${n - 1} knockouts land in the same order.`}
                         </p>
+
+                        {myCall !== null && fighters[myCall] ? (
+                          <div
+                            className="mt-6 rounded-xs border px-4 py-3"
+                            style={{
+                              borderColor:
+                                myCall === fight.winner
+                                  ? 'var(--color-annunciator)'
+                                  : 'var(--color-hairline-hot)',
+                            }}
+                          >
+                            <Label
+                              style={{
+                                color:
+                                  myCall === fight.winner
+                                    ? 'var(--color-annunciator)'
+                                    : 'var(--color-mute)',
+                              }}
+                            >
+                              {myCall === fight.winner ? 'You called it' : 'Your call'}
+                            </Label>
+                            <p className="mt-1.5 text-sm text-ink">
+                              {myCall === fight.winner
+                                ? `You had ${fighters[myCall].name} taking Pick 1. Respect.`
+                                : fight.pickOf[myCall] <= 3
+                                  ? `You had ${fighters[myCall].name} — they fell at Pick ${fight.pickOf[myCall]}. Agonizingly close.`
+                                  : `You had ${fighters[myCall].name} — they went out at Pick ${fight.pickOf[myCall]}. Not even close.`}
+                            </p>
+                          </div>
+                        ) : null}
+
+                        <div className="rule my-6" />
+                        <Label className="mb-3 text-dim">Fight awards</Label>
+                        <ul className="grid gap-2 sm:grid-cols-2">
+                          {awards.map((a) => (
+                            <li
+                              key={a.title}
+                              className="flex items-center gap-3 rounded-xs border border-hairline px-3 py-2"
+                            >
+                              <SpriteAvatar fighter={fighters[a.id]} size={40} />
+                              <span className="min-w-0">
+                                <span
+                                  className="readout block text-[10px] tracking-[0.16em]"
+                                  style={{ color: fighters[a.id].color }}
+                                >
+                                  {a.title}
+                                </span>
+                                <span className="block truncate text-sm text-ink">
+                                  {fighters[a.id].name}
+                                  <span className="text-mute"> · {a.detail}</span>
+                                </span>
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+
+                        <div className="mt-6 overflow-x-auto">
+                          <table className="w-full min-w-105 text-left">
+                            <thead>
+                              <tr className="border-b border-hairline">
+                                {['PICK', 'MANAGER', 'DMG', 'TAKEN', 'KOS', 'LASTED'].map((h) => (
+                                  <th key={h} className="label py-2 pr-4 font-medium">
+                                    {h}
+                                  </th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {fight.order.map((id, i) => (
+                                <tr key={id} className="border-b border-hairline/50">
+                                  <td className="readout py-1.5 pr-4 text-xs text-amber">
+                                    {String(i + 1).padStart(2, '0')}
+                                  </td>
+                                  <td className="py-1.5 pr-4 text-sm text-ink">
+                                    {fighters[id].name}
+                                  </td>
+                                  <td className="readout py-1.5 pr-4 text-xs text-dim">
+                                    {fight.stats[id].dmg}
+                                  </td>
+                                  <td className="readout py-1.5 pr-4 text-xs text-dim">
+                                    {fight.stats[id].taken}
+                                  </td>
+                                  <td className="readout py-1.5 pr-4 text-xs text-dim">
+                                    {fight.stats[id].kos}
+                                  </td>
+                                  <td className="readout py-1.5 pr-4 text-xs text-dim">
+                                    {clock(fight.stats[id].survived / 30)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
 
                   <aside>

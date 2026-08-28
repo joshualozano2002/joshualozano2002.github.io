@@ -23,9 +23,22 @@ const HUES = [
 const SKINS = ['#f2c9a0', '#e6b184', '#cf9060', '#a96b40', '#7d4d2b', '#5d3a20']
 const HAIRS = ['#15151d', '#2f2318', '#5c3016', '#8a6a2f', '#c7cdd6', '#7a2020']
 
+// Signature-move names, assembled per fighter from the seed.
+const MOVE_A = [
+  'ATOMIC', 'SEISMIC', 'MIDNIGHT', 'DIESEL', 'VENOM', 'GRAVITY', 'OBSIDIAN',
+  'RABID', 'GOLDEN', 'CRIMSON', 'PHANTOM', 'HOWLING', 'STEEL', 'ROGUE',
+]
+const MOVE_B = [
+  'SUPLEX', 'LARIAT', 'DRIVER', 'PILEDRIVER', 'CLOTHESLINE', 'DDT',
+  'POWERBOMB', 'SPINEBUSTER', 'HAYMAKER', 'BACKBREAKER', 'DROPKICK', 'ELBOW',
+]
+
 /** Deterministic per-fighter identity: callsign, colour, and a jersey number. */
 export function buildFighters(seed, managers) {
   const rng = makeRng(`${seed}:roster`)
+  // Move names draw from their own stream so adding them did not reshuffle
+  // the identities that links already handed out.
+  const mv = makeRng(`${seed}:moves`)
   const calls = shuffle(rng, CALLSIGNS.slice())
   // The hue list is ordered so neighbours contrast; rotating it rather than
   // shuffling keeps that guarantee while still varying fight to fight.
@@ -45,6 +58,7 @@ export function buildFighters(seed, managers) {
       short: name.split(/\s+/)[0].slice(0, 9).toUpperCase(),
       callsign: calls[i % calls.length],
       number: 1 + Math.floor(rng() * 98),
+      move: `${MOVE_A[randInt(mv, MOVE_A.length)]} ${MOVE_B[randInt(mv, MOVE_B.length)]}`,
       hue,
       color,
       dim: `hsl(${hue} 40% ${Math.round(light * 0.42)}%)`,

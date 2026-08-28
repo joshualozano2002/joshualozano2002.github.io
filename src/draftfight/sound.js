@@ -83,6 +83,25 @@ export const sfxWin = () => {
   sfxRoar(1.5)
 }
 
+/** A signature move connecting — riser into a heavy slam. */
+export const sfxSpecial = () => {
+  blip({ freq: 180, to: 720, dur: 0.16, type: 'sawtooth', gain: 0.05 })
+  blip({ freq: 150, to: 38, dur: 0.22, type: 'triangle', gain: 0.11, delay: 0.14 })
+  noise({ dur: 0.12, gain: 0.07, freq: 1200, type: 'highpass', delay: 0.14 })
+  sfxRoar(0.5)
+}
+
+/** The crowd stomping and clapping for the final two. */
+export const sfxChant = () => {
+  for (let k = 0; k < 2; k++) {
+    const base = k * 0.62
+    noise({ dur: 0.1, gain: 0.07, freq: 260, delay: base })
+    noise({ dur: 0.1, gain: 0.07, freq: 260, delay: base + 0.17 })
+    noise({ dur: 0.12, gain: 0.08, freq: 1400, type: 'highpass', delay: base + 0.36 })
+  }
+  sfxRoar(0.4)
+}
+
 /** The bell that starts it. */
 export const sfxBell = () => {
   ;[0, 0.28, 0.56].forEach((d) => {

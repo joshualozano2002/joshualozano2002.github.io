@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
 import { drawShadow, drawWrestler } from './sprite.js'
-import { sfxElim, sfxHit, sfxWin } from './sound.js'
+import { sfxChant, sfxElim, sfxHit, sfxSpecial, sfxWin } from './sound.js'
 
 /**
  * Plays back a finished simulation as a wrestling broadcast.
@@ -59,6 +59,7 @@ export default function Arena({
   onElim,
   onClock,
   onEnd,
+  onTicker, // play-by-play lines for the broadcast booth
 }) {
   const wrapRef = useRef(null)
   const canvasRef = useRef(null)
@@ -68,13 +69,13 @@ export default function Arena({
   const speedRef = useRef(speed)
   const soundRef = useRef(sound)
   const clockRef = useRef(clock)
-  const cbRef = useRef({ onElim, onClock, onEnd })
+  const cbRef = useRef({ onElim, onClock, onEnd, onTicker })
 
   playingRef.current = playing
   speedRef.current = speed
   soundRef.current = sound
   clockRef.current = clock
-  cbRef.current = { onElim, onClock, onEnd }
+  cbRef.current = { onElim, onClock, onEnd, onTicker }
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -117,7 +118,20 @@ export default function Arena({
       lastDef: new Array(n).fill(-999),
       faceX: new Array(n).fill(CX),
       facing: new Array(n).fill(1),
+      // Broadcast-booth state.
+      special: null, // {at, text, color}
+      final2At: 0,
+      chantAt: 0,
+      zoom: 0,
+      prevAlive: n,
+      koBy: -1,
+      koStreak: 0,
+      koAt: -9999,
+      hurtCalled: new Array(n).fill(false),
+      milestones: new Set(),
     }
+
+    const say = (text) => cbRef.current.onTicker?.(text)
 
     const at = (arr, t, i) => arr[t * n + i]
     const mono = (px_) => `700 ${px_}px "JetBrains Mono", ui-monospace, monospace`
@@ -208,7 +222,15 @@ export default function Arena({
           run.faceX[h.d] = h.x
           if (t0 - h.t <= 8) {
             run.sparks.push({ x: h.x, y: h.y, life: 0, p: Math.min(h.p, 1.4) })
-            if (h.p > 0.85)
+            if (h.s) {
+              // A signature move: bigger everything, and it gets said out loud.
+              const A = fighters[h.a]
+              run.special = { at: now, text: `${A.short} HITS THE ${A.move}!`, color: A.color }
+              run.sparks.push({ x: h.x, y: h.y, life: 0, p: 2.2 })
+              run.shake = 20
+              if (soundRef.current) sfxSpecial()
+              say(`${A.name} connects with the ${A.move} on ${fighters[h.d].name}!`)
+            } else if (h.p > 0.85) {
               run.pows.push({
                 x: h.x,
                 y: h.y,
@@ -216,6 +238,7 @@ export default function Arena({
                 txt: POWS[run.hit % POWS.length],
                 rot: (Math.random() - 0.5) * 0.4,
               })
+            }
             run.shake = Math.min(run.shake + 2 + h.p * 3.5, 15)
             if (soundRef.current) sfxHit(h.p)
           }
@@ -227,12 +250,69 @@ export default function Arena({
             run.banner = { at: now, e }
             run.shake = 17
             if (soundRef.current) sfxElim()
+            const loser = fighters[e.id].name
+            if (e.by >= 0) {
+              if (e.by === run.koBy && e.t - run.koAt < TICK_HZ * 20) run.koStreak++
+              else run.koStreak = 1
+              run.koBy = e.by
+              run.koAt = e.t
+              const by = fighters[e.by].name
+              say(
+                run.koStreak >= 2
+                  ? `${by} throws out ${loser} — that's ${run.koStreak} eliminations. RAMPAGE!`
+                  : `${by} launches ${loser} over the top rope. Pick ${e.pick} is settled.`,
+              )
+            } else {
+              say(`${loser} is gone — pick ${e.pick} is settled.`)
+            }
           }
         }
       }
 
       let aliveNow = 0
       for (let i = 0; i < n; i++) if (at(state, t0, i) === 2) aliveNow++
+
+      // Booth calls on the shape of the fight.
+      if (run.elapsed >= 0) {
+        if (!run.milestones.has('bell')) {
+          run.milestones.add('bell')
+          say(`The bell rings — ${n} managers, one ring, and only one Pick 1.`)
+        }
+        const half = Math.ceil(n / 2)
+        if (aliveNow <= half && aliveNow > 3 && !run.milestones.has('half')) {
+          run.milestones.add('half')
+          say(`Half the field is on the floor — ${aliveNow} still swinging.`)
+        }
+        if (aliveNow === 3 && !run.milestones.has('three')) {
+          run.milestones.add('three')
+          say(`THREE LEFT. It is anyone's draft.`)
+        }
+        if (aliveNow === 2 && run.prevAlive > 2) {
+          run.final2At = now
+          run.milestones.add('two')
+          const pair = []
+          for (let i = 0; i < n; i++) if (at(state, t0, i) === 2) pair.push(fighters[i].short)
+          say(`FINAL TWO — ${pair[0]} and ${pair[1]} both find a second wind. Winner takes Pick 1.`)
+          if (soundRef.current) {
+            sfxChant()
+            run.chantAt = now
+          }
+        }
+        if (aliveNow === 2 && soundRef.current && now - run.chantAt > 9000) {
+          run.chantAt = now
+          sfxChant()
+        }
+        // Somebody hanging on by a thread, once each.
+        if ((t0 & 7) === 0) {
+          for (let i = 0; i < n; i++) {
+            if (at(state, t0, i) === 2 && at(hp, t0, i) < 0.14 && !run.hurtCalled[i]) {
+              run.hurtCalled[i] = true
+              say(`${fighters[i].name} is hanging on by a thread!`)
+            }
+          }
+        }
+        run.prevAlive = aliveNow
+      }
 
       const secs = Math.max(0, run.elapsed / 1000)
       if (run.clockAt < 0 || secs - run.clockAt > 0.2 || aliveNow <= 1) {
@@ -257,6 +337,31 @@ export default function Arena({
 
       ctx.fillStyle = '#04060a'
       ctx.fillRect(-40, -40, 1080, VIEW_H + 80)
+
+      // FINAL TWO: the camera leans in on the survivors.
+      const wantZoom = aliveNow === 2 && !finished && run.elapsed >= 0 ? 1 : 0
+      run.zoom += (wantZoom - run.zoom) * Math.min(1, dt / 500)
+      ctx.save()
+      if (run.zoom > 0.01) {
+        let zx = 0
+        let zy = 0
+        let cnt = 0
+        for (let i = 0; i < n; i++) {
+          if (at(state, t0, i) !== 2) continue
+          const [X, Y] = proj(at(px, t0, i), at(py, t0, i))
+          zx += X
+          zy += Y
+          cnt++
+        }
+        if (cnt > 0) {
+          zx /= cnt
+          zy /= cnt
+          const zs = 1 + 0.16 * run.zoom
+          ctx.translate(zx, zy)
+          ctx.scale(zs, zs)
+          ctx.translate(-zx, -zy)
+        }
+      }
 
       // House lights: two beams crossing on the ring.
       for (const [bx, col] of [
@@ -499,6 +604,24 @@ export default function Arena({
       // Bodies at ringside land in front of everything.
       for (const fgt of outside) drawOne(fgt)
 
+      // FINAL TWO: house lights down, spotlights up on the survivors.
+      if (run.zoom > 0.25) {
+        ctx.fillStyle = `rgba(2,4,8,${0.32 * run.zoom})`
+        ctx.fillRect(-80, -80, 1160, VIEW_H + 160)
+        for (const fgt of inRing) {
+          const [X, Y, d] = proj(fgt.wx, fgt.wy)
+          ctx.beginPath()
+          ctx.moveTo(X - 24, -20)
+          ctx.lineTo(X + 24, -20)
+          ctx.lineTo(X + 55 * d, Y + 22 * d)
+          ctx.lineTo(X - 55 * d, Y + 22 * d)
+          ctx.closePath()
+          ctx.fillStyle = `rgba(255,225,160,${0.12 * run.zoom})`
+          ctx.fill()
+          drawOne(fgt)
+        }
+      }
+
       // ---- FX ----
       for (let i = run.sparks.length - 1; i >= 0; i--) {
         const sp = run.sparks[i]
@@ -531,6 +654,8 @@ export default function Arena({
         ctx.globalAlpha = 1
       }
 
+      ctx.restore() // end FINAL TWO camera
+
       // Confetti for the champion.
       if (finished && !reduced) {
         if (run.confetti.length < 130)
@@ -561,6 +686,36 @@ export default function Arena({
         }
       }
 
+      // Signature-move call-out, splashed across the screen.
+      if (run.special && now - run.special.at < 1500) {
+        const k = (now - run.special.at) / 1500
+        const scale = k < 0.12 ? 0.6 + (k / 0.12) * 0.5 : 1.1 - k * 0.12
+        ctx.save()
+        ctx.translate(500, 250)
+        ctx.scale(scale, scale)
+        ctx.globalAlpha = k > 0.72 ? (1 - k) * 3.5 : 1
+        ctx.font = mono(40)
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.lineWidth = 9
+        ctx.lineJoin = 'round'
+        ctx.strokeStyle = 'rgba(5,8,12,0.95)'
+        ctx.strokeText(run.special.text, 0, 0)
+        ctx.fillStyle = run.special.color
+        ctx.fillText(run.special.text, 0, 0)
+        ctx.restore()
+        ctx.globalAlpha = 1
+      }
+
+      // FINAL TWO title card.
+      if (run.final2At && now - run.final2At < 2600 && !finished) {
+        const k = (now - run.final2At) / 2600
+        ctx.globalAlpha = k > 0.8 ? (1 - k) * 5 : 1
+        outlined('FINAL TWO', 500, 300, 74, '#ff9d2e')
+        outlined('WINNER TAKES PICK 1', 500, 360, 24, '#e2e9f0')
+        ctx.globalAlpha = 1
+      }
+
       // Elimination call-out.
       if (run.banner && now - run.banner.at < BANNER_MS && !finished) {
         const k = (now - run.banner.at) / BANNER_MS
@@ -573,7 +728,14 @@ export default function Arena({
         ctx.font = mono(30)
         ctx.textAlign = 'center'
         ctx.fillStyle = '#e2e9f0'
-        ctx.fillText(`${f.name.toUpperCase()} IS OVER THE TOP ROPE`, 500, VIEW_H - 76)
+        const by = run.banner.e.by >= 0 ? fighters[run.banner.e.by] : null
+        ctx.fillText(
+          by
+            ? `${by.name.toUpperCase()} ELIMINATES ${f.name.toUpperCase()}`
+            : `${f.name.toUpperCase()} IS OVER THE TOP ROPE`,
+          500,
+          VIEW_H - 76,
+        )
         ctx.font = mono(22)
         ctx.fillStyle = '#ff9d2e'
         ctx.fillText(`PICK ${run.banner.e.pick}`, 500, VIEW_H - 44)
