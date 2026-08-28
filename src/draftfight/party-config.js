@@ -5,4 +5,4 @@
  * viewer count, emoji reactions, and prediction tally — see party/README.md.
  * Leave null and the site is fully static with no presence features.
  */
-export const PARTY_URL = null
+export const PARTY_URL = 'wss://draft-fight-party.jlozano2002.workers.dev'
