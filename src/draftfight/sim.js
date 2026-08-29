@@ -17,11 +17,12 @@
  * knockout throws you over the top rope — you fly out and land at ringside,
  * lined up in elimination order so the aftermath reads like a draft board.
  *
- * Format: a royal rumble. Two managers start at the bell; the rest enter one
- * at a time on a seeded schedule. Entry order is drawn fresh per fight, so no
- * roster slot is ever favoured — but the draw itself is part of the show.
+ * Format: everyone starts at the bell. Length and drama come from pacing —
+ * recovery between exchanges, crowd-thinned damage early, one hang-on save
+ * apiece, and dig-deep resets at the final four and final two.
  */
 import { makeRng, shuffle } from './rng.js'
+import { SPAWNS } from './spawns.js'
 
 export const TICK_HZ = 30
 export const WORLD = 1000
@@ -85,8 +86,8 @@ export function simulate(seed, n) {
   // drawn entirely up front, so the main combat stream is never disturbed.
   const objRng = makeRng(`${seed}:objects`)
   const chairPlan = [
-    { at: Math.floor(lastEntryT * 0.45 + objRng() * 300), ang: objRng(), rad: 95 + objRng() * 65 },
-    { at: Math.floor(lastEntryT * 0.95 + objRng() * 300), ang: objRng(), rad: 95 + objRng() * 65 },
+    { at: Math.floor(TICK_HZ * (40 + objRng() * 25)), ang: objRng(), rad: 95 + objRng() * 65 },
+    { at: Math.floor(TICK_HZ * (110 + objRng() * 40)), ang: objRng(), rad: 95 + objRng() * 65 },
   ]
   const objects = [] // renderer + booth event feed
   let chairPlanIdx = 0
@@ -142,18 +143,21 @@ export function simulate(seed, n) {
   const pairDmg = new Float64Array(n * n)
   let feudEvent = null
 
+  // Which manager stands where is drawn, not derived from list position.
+  const slots = shuffle(rng, SPAWNS[n].slice())
+
   for (let i = 0; i < n; i++) {
-    // Later entrants wait backstage at the tunnel; the opening pair squares up.
-    const opening = entryTick[i] === 0
-    x[i] = opening ? entryX[i] : 500
-    y[i] = opening ? 420 + rng() * 160 : 36
-    hpMax[i] = 100 * (0.88 + rng() * 0.26)
+    const [ux, uy] = slots[i]
+    const spread = 240 + rng() * 40
+    x[i] = CX + ux * spread
+    y[i] = CY + uy * spread
+    hpMax[i] = 120 * (0.72 + rng() * 0.55)
     hp[i] = hpMax[i]
     speed[i] = 2.05 + rng() * 1.35
-    power[i] = 0.78 + rng() * 0.48
+    power[i] = 0.68 + rng() * 0.62
     cool[i] = 6 + rng() * 18
     target[i] = -1
-    state[i] = entryTick[i] === 0 ? 2 : 0 // 0 = backstage, waiting for the buzzer
+    state[i] = 2
     // Drawn, not derived from i: re-aiming a tick after everyone else has
     // moved is worth something, and that edge must not follow a roster slot.
     phase[i] = Math.floor(rng() * 24)
@@ -164,9 +168,7 @@ export function simulate(seed, n) {
   // the processing order keeps that edge from attaching to a roster slot.
   const ord = shuffle(rng, Array.from({ length: n }, (_, i) => i))
 
-  let alive = 2
-  let entered = 2
-  let fullHealDone = false
+  let alive = n
   let ticks = 0
   let outro = 0
 
@@ -180,28 +182,7 @@ export function simulate(seed, n) {
     }
     ticks = t + 1
 
-    // The buzzer: scheduled entrants hit the ring over the top rope.
-    for (let i = 0; i < n; i++) {
-      if (state[i] === 0 && t >= entryTick[i]) {
-        state[i] = 2
-        x[i] = entryX[i]
-        y[i] = LO + 10
-        alive++
-        entered++
-      }
-    }
-
-    // The moment the field is complete, every survivor digs deep: wear from
-    // the entry phase is largely wiped, so the endgame is decided by the
-    // fight in front of everyone, not by who happened to enter last.
-    if (entered === n && !fullHealDone) {
-      fullHealDone = true
-      for (let j = 0; j < n; j++) {
-        if (state[j] === 2 && hp[j] < hpMax[j] * 0.85) hp[j] = hpMax[j] * 0.85
-      }
-    }
-
-    if (alive <= 1 && entered === n) {
+    if (alive <= 1) {
       outro++
       if (outro > OUTRO_TICKS) break
     }
@@ -283,8 +264,7 @@ export function simulate(seed, n) {
     }
 
     // Down to the final pairs the crowd wants an ending, not a stamina duel.
-    const full = entered === n
-    const dmgMul = ramp(t, lastEntryT) * (full && alive <= 2 ? 1.3 : full && alive <= 3 ? 1.05 : 1)
+    const dmgMul = ramp(t) * (alive <= 2 ? 1.3 : alive <= 3 ? 1.05 : 1)
     const forceEnd = t > MAX_TICKS - 150
 
     for (let q = 0; q < n; q++) {
@@ -304,18 +284,21 @@ export function simulate(seed, n) {
         }
         continue
       }
-      if (state[i] === 3 || state[i] === 0) continue
-      if (alive <= 1 && entered === n) continue // the winner holds still for the celebration
+      if (state[i] === 3) continue
+      if (alive <= 1) continue // the winner holds still for the celebration
 
       // Retarget when the current mark is down, or on a staggered timer.
       if (target[i] < 0 || state[target[i]] !== 2 || (t + phase[i]) % 24 === 0) {
+        // Sharks smell blood: closeness matters most, but a wounded opponent
+        // nearby is irresistible. Spreads eliminations across the fight
+        // instead of the whole ring collapsing at once.
         let best = -1
         let bestD = Infinity
         for (let j = 0; j < n; j++) {
           if (j === i || state[j] !== 2) continue
           const dx = x[j] - x[i]
           const dy = y[j] - y[i]
-          const d = dx * dx + dy * dy
+          const d = (dx * dx + dy * dy) * (hp[j] / hpMax[j] + 0.3)
           if (d < bestD) {
             bestD = d
             best = j
@@ -343,7 +326,7 @@ export function simulate(seed, n) {
           // coming — the rumble builds instead of collapsing in waves — then
           // the brakes come off once the field is complete and the endgame
           // belongs to the fighting. Solo showdowns always hit at full force.
-          const crowd = alive > 2 ? Math.min(1, (entered < n ? 1.05 : 2.1) / alive) : 1
+          const crowd = alive > 2 ? Math.min(1, (2.0 + 0.2 * alive) / alive) : 1
           const dmg = roll * power[i] * dmgMul * crowd * (chair ? 2.2 : 1)
           hp[tg] -= dmg
           lastHitBy[tg] = i
@@ -411,7 +394,7 @@ export function simulate(seed, n) {
       // starts creeping back. Active beatdowns still finish; what this stops
       // is the whole ring wearing down in lockstep and collapsing at once.
       if (hp[i] < hpMax[i] && t - lastHurtT[i] > TICK_HZ * 3) {
-        hp[i] += (0.085 * hpMax[i]) / 100
+        hp[i] += (0.065 * hpMax[i]) / 100
         if (hp[i] > hpMax[i]) hp[i] = hpMax[i]
       }
 
@@ -487,7 +470,7 @@ export function simulate(seed, n) {
       // Everyone gets one miracle: the first time you'd go over the ropes
       // (outside the final duel), you hang on by your fingertips instead.
       // Symmetric, so it favours nobody — it just makes near-death a story.
-      if (!hangUsed[i] && alive > 2 && !forceEnd) {
+      if (!hangUsed[i] && alive > 2 && alive <= n - 2 && !forceEnd) {
         hangUsed[i] = 1
         hp[i] = hpMax[i] * 0.06
         saves.push({ t, id: i })
@@ -524,12 +507,12 @@ export function simulate(seed, n) {
       // The survivors dig deep. Symmetric heals at the final four and the
       // final two reset accumulated wear, so a late entry number is a real
       // edge but never a coronation — the endgame belongs to everyone in it.
-      if (alive === 4 && entered === n) {
+      if (alive === 4) {
         for (let j = 0; j < n; j++) {
           if (state[j] === 2 && hp[j] < hpMax[j] * 0.5) hp[j] = hpMax[j] * 0.5
         }
       }
-      if (alive === 2 && entered === n) {
+      if (alive === 2) {
         for (let j = 0; j < n; j++) {
           if (state[j] === 2 && hp[j] < hpMax[j] * 0.45) hp[j] = hpMax[j] * 0.45
         }
@@ -548,7 +531,7 @@ export function simulate(seed, n) {
     kos: sKos[i],
     hits: sHits[i],
     chair: Math.round(sChair[i]),
-    survived: (sOut[i] < 0 ? ticks : sOut[i]) - entryTick[i],
+    survived: sOut[i] < 0 ? ticks : sOut[i],
   }))
 
   const picks = [winner, ...order.slice().reverse().filter((id) => id !== winner)]
@@ -566,10 +549,6 @@ export function simulate(seed, n) {
     state: pstate.subarray(0, ticks * n),
     koTick,
     pickOf,
-    entries,
-    entryTick,
-    entryOrder,
-    lastEntryT,
     stats,
     saves,
     feudEvent,

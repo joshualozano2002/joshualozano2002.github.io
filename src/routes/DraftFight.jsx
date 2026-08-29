@@ -467,7 +467,7 @@ export default function DraftFight() {
   useEffect(() => {
     if (!spec?.startAt || !fight || replay) return
     const sinceBell = sharedNow() - spec.startAt
-    const preShow = introDurationMs() + 2000
+    const preShow = introDurationMs(spec.managers.length) + 2000
     if (sinceBell > fight.durationMs + 2000) {
       const all = {}
       fight.order.forEach((id, i) => {
@@ -486,7 +486,7 @@ export default function DraftFight() {
     if (!spec?.startAt || replay || phase === 'done') return
     const id = setInterval(() => {
       setTick((t) => t + 1)
-      if (spec.startAt - sharedNow() <= introDurationMs() + 2000) {
+      if (spec.startAt - sharedNow() <= introDurationMs(spec.managers.length) + 2000) {
         setPhase((p) => (p === 'lobby' ? 'live' : p))
       }
     }, 250)
@@ -603,10 +603,10 @@ export default function DraftFight() {
                 Draft Fight
               </h1>
               <p className="mt-6 max-w-2xl text-base leading-relaxed text-dim text-pretty sm:text-lg">
-                Nobody trusts the randomize button. Settle it with a rumble instead: two managers
-                start at the bell, a new one hits the ring every twenty seconds, and the draft
-                order comes off the floor — first one out picks last, last one standing picks
-                first. One link, and the whole league watches the same fight, hit for hit.
+                Nobody trusts the randomize button. Put every manager in the ring instead — full
+                entrances, one bell, everyone fighting at once — and take the draft order off the
+                floor: first one out picks last, last one standing picks first. One link, and the
+                whole league watches the same fight, hit for hit.
               </p>
               <Setup onStart={publish} />
             </>
@@ -736,7 +736,7 @@ export default function DraftFight() {
                       </p>
                       <p className="mx-auto mt-4 max-w-md text-xs leading-relaxed text-mute">
                         Wrestler entrances begin about{' '}
-                        {Math.round(introDurationMs() / 1000)} seconds before the bell, right here,
+                        {Math.round(introDurationMs(n) / 1000)} seconds before the bell, right here,
                         by themselves, for everyone at once. Nobody can watch early — you included.
                         Tune in late and you join the fight already in progress.
                       </p>
@@ -791,7 +791,7 @@ export default function DraftFight() {
                             ? 'Fight over'
                             : hud.secs < 0
                               ? 'Entrances'
-                              : `${hud.alive} in the ring`}
+                              : `${hud.alive} standing`}
                         </span>
                       </div>
                       {phase === 'live' && isLive ? (
