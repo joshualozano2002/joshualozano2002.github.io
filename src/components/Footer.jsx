@@ -77,7 +77,15 @@ export default function Footer() {
             © {year} {profile.name.toUpperCase()}
           </p>
           <p className="readout text-[10px] tracking-[0.2em] text-mute">
-            END OF TRANSMISSION · N426NA
+            END OF TRANSMISSION · N426NA ·{' '}
+            {/* Off the clock: the league knows what this is. */}
+            <Link
+              to="/draft-fight"
+              className="transition-colors hover:text-amber"
+              title="Settle it in the ring"
+            >
+              OFF DUTY: THE RING
+            </Link>
           </p>
         </div>
       </div>
