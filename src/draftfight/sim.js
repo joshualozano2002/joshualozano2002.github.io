@@ -82,22 +82,75 @@ export function simulate(seed, n) {
   const lastEntryT = entries.length ? entries[entries.length - 1].t : 0
   const MAX_TICKS = lastEntryT + TICK_HZ * 240
 
-  // The steel chair. Its schedule and placement come from a separate stream,
-  // drawn entirely up front, so the main combat stream is never disturbed.
+  // The arsenal. Schedules, types, and placements come from a separate
+  // stream, drawn entirely up front, so the main combat stream is never
+  // disturbed. Every weapon is seeded — the same fight for every viewer.
+  const WEAPONS = {
+    chair: { uses: 5, mult: 2.2 }, // the classic
+    kendo: { uses: 9, mult: 1.5 }, // fast and mean
+    can: { uses: 1, mult: 3.0 }, // one shot, and the target sees stars
+  }
+  const WKINDS = ['chair', 'kendo', 'can']
   const objRng = makeRng(`${seed}:objects`)
   const chairPlan = [
-    { at: Math.floor(TICK_HZ * (40 + objRng() * 25)), ang: objRng(), rad: 95 + objRng() * 65 },
-    { at: Math.floor(TICK_HZ * (110 + objRng() * 40)), ang: objRng(), rad: 95 + objRng() * 65 },
+    {
+      at: Math.floor(TICK_HZ * (35 + objRng() * 22)),
+      w: WKINDS[Math.floor(objRng() * 3) % 3],
+      ang: objRng(),
+      rad: 95 + objRng() * 65,
+    },
+    {
+      at: Math.floor(TICK_HZ * (85 + objRng() * 28)),
+      w: WKINDS[Math.floor(objRng() * 3) % 3],
+      ang: objRng(),
+      rad: 95 + objRng() * 65,
+    },
+    {
+      at: Math.floor(TICK_HZ * (135 + objRng() * 30)),
+      w: WKINDS[Math.floor(objRng() * 3) % 3],
+      ang: objRng(),
+      rad: 95 + objRng() * 65,
+    },
   ]
+  // The table: set up mid-ring, waiting for somebody to be put through it.
+  const tablePlan = {
+    happens: objRng() < 0.75,
+    at: Math.floor(TICK_HZ * (45 + objRng() * 45)),
+    x: 320 + objRng() * 360,
+    y: 320 + objRng() * 360,
+  }
   const objects = [] // renderer + booth event feed
   let chairPlanIdx = 0
-  // -1 none · -2 destroyed for now · >=0 held by that fighter · 'mat' via chairOnMat
   let chairHolder = -1
+  let weaponKind = null // what the holder is swinging
   let chairOnMat = false
   let chairX = 0
   let chairY = 0
   let chairSwings = 0
   let chairLandT = 0 // pickup waits for the slide-in to finish
+  let tableUp = false
+  let tableDone = false
+  const stunnedUntil = new Int32Array(n).fill(-1)
+
+  // Earned specials: deal enough damage and you take to the top rope; absorb
+  // enough and the comeback kicks in. Thresholds, not dice — you earn them.
+  const dealtSince = new Float64Array(n)
+  const takenSince = new Float64Array(n)
+  const mode = new Uint8Array(n) // 0 fighting · 1 climbing · 2 diving
+  const modeT = new Int32Array(n)
+  const diveTX = new Float64Array(n)
+  const diveTY = new Float64Array(n)
+  const diveSX = new Float64Array(n)
+  const diveSY = new Float64Array(n)
+  const diveCount = new Uint8Array(n)
+  const raged = new Uint8Array(n)
+  const rageUntil = new Int32Array(n).fill(-1)
+  const CORNERS_IN = [
+    [LO + 6, LO + 6],
+    [HI - 6, LO + 6],
+    [HI - 6, HI - 6],
+    [LO + 6, HI - 6],
+  ]
 
   const px = new Float32Array(MAX_TICKS * n)
   const py = new Float32Array(MAX_TICKS * n)
@@ -178,7 +231,8 @@ export function simulate(seed, n) {
       px[k] = x[i]
       py[k] = y[i]
       php[k] = hp[i] > 0 ? hp[i] / hpMax[i] : 0
-      pstate[k] = state[i]
+      pstate[k] =
+        state[i] === 2 && mode[i] === 1 ? 4 : state[i] === 2 && mode[i] === 2 ? 5 : state[i]
     }
     ticks = t + 1
 
@@ -242,7 +296,14 @@ export function simulate(seed, n) {
         }
       }
       chairLandT = t + 16
-      objects.push({ k: 'spawn', t, x: chairX, y: chairY, fx: edges[ei][0], fy: edges[ei][1] })
+      weaponKind = plan.w
+      objects.push({ k: 'spawn', w: plan.w, t, x: chairX, y: chairY, fx: edges[ei][0], fy: edges[ei][1] })
+    }
+
+    // The table gets set up once the crowd is warm.
+    if (tablePlan.happens && !tableUp && !tableDone && t >= tablePlan.at && alive > 3) {
+      tableUp = true
+      objects.push({ k: 'tspawn', t, x: tablePlan.x, y: tablePlan.y })
     }
 
     // First fighter to reach a loose chair takes it. Checked in the drawn
@@ -256,8 +317,8 @@ export function simulate(seed, n) {
         if (dx * dx + dy * dy < 42 * 42) {
           chairOnMat = false
           chairHolder = i
-          chairSwings = 5
-          objects.push({ k: 'pick', t, by: i })
+          chairSwings = WEAPONS[weaponKind].uses
+          objects.push({ k: 'pick', w: weaponKind, t, by: i })
           break
         }
       }
@@ -287,6 +348,132 @@ export function simulate(seed, n) {
       if (state[i] === 3) continue
       if (alive <= 1) continue // the winner holds still for the celebration
 
+      if (forceEnd) hp[i] -= 2
+
+      // The comeback: soak enough punishment and you start swinging harder.
+      if (!raged[i] && takenSince[i] >= 125 && alive > 2) {
+        raged[i] = 1
+        rageUntil[i] = t + 150
+        takenSince[i] = 0
+        objects.push({ k: 'rage', t, by: i })
+      }
+
+      // Climbing: head for the corner, perch, pick a victim, and fly.
+      if (mode[i] === 1) {
+        const dx = diveTX[i] - x[i]
+        const dy = diveTY[i] - y[i]
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist > 8) {
+          const sp = (speed[i] * 1.5) / dist
+          x[i] += dx * sp
+          y[i] += dy * sp
+        } else {
+          modeT[i]++
+          if (modeT[i] >= 14) {
+            let best = -1
+            let bestD = Infinity
+            for (let j = 0; j < n; j++) {
+              if (j === i || state[j] !== 2 || mode[j] !== 0) continue
+              const jx = x[j] - x[i]
+              const jy = y[j] - y[i]
+              const d = jx * jx + jy * jy
+              if (d < bestD) {
+                bestD = d
+                best = j
+              }
+            }
+            if (best < 0) {
+              mode[i] = 0
+              dealtSince[i] = 0
+            } else {
+              mode[i] = 2
+              modeT[i] = 0
+              diveSX[i] = x[i]
+              diveSY[i] = y[i]
+              diveTX[i] = x[best]
+              diveTY[i] = y[best]
+            }
+          }
+        }
+        continue
+      }
+
+      // Airborne: sixteen ticks of flight, then everybody near the landing pays.
+      if (mode[i] === 2) {
+        modeT[i]++
+        const pr = modeT[i] / 16
+        if (pr >= 1) {
+          x[i] = diveTX[i]
+          y[i] = diveTY[i]
+          mode[i] = 0
+          dealtSince[i] = 0
+          const crowd = alive > 2 ? Math.min(1, (2.0 + 0.2 * alive) / alive) : 1
+          for (let j = 0; j < n; j++) {
+            if (j === i || state[j] !== 2) continue
+            const jx = x[j] - x[i]
+            const jy = y[j] - y[i]
+            const d = Math.sqrt(jx * jx + jy * jy)
+            if (d < 58) {
+              const D = 15 * power[i] * dmgMul * crowd
+              hp[j] -= D
+              lastHitBy[j] = i
+              lastHurtT[j] = t
+              sDmg[i] += D
+              sTaken[j] += D
+              takenSince[j] += D
+              const kb = d > 0.001 ? 7 / d : 0
+              ix[j] += jx * kb
+              iy[j] += jy * kb
+            }
+          }
+          objects.push({ k: 'dive', t, by: i, x: x[i], y: y[i] })
+        } else {
+          x[i] = diveSX[i] + (diveTX[i] - diveSX[i]) * pr
+          y[i] = diveSY[i] + (diveTY[i] - diveSY[i]) * pr
+        }
+        continue
+      }
+
+      // Earn the top rope: enough damage dealt, no weapon in hand, field open.
+      if (
+        mode[i] === 0 &&
+        diveCount[i] < 1 &&
+        dealtSince[i] >= 95 &&
+        chairHolder !== i &&
+        alive > 2
+      ) {
+        let ci = 0
+        let cd = Infinity
+        for (let c = 0; c < 4; c++) {
+          const dx = CORNERS_IN[c][0] - x[i]
+          const dy = CORNERS_IN[c][1] - y[i]
+          const d = dx * dx + dy * dy
+          if (d < cd) {
+            cd = d
+            ci = c
+          }
+        }
+        mode[i] = 1
+        modeT[i] = 0
+        diveCount[i]++
+        diveTX[i] = CORNERS_IN[ci][0]
+        diveTY[i] = CORNERS_IN[ci][1]
+        continue
+      }
+
+      // Seeing stars: a trash-can shot leaves you standing but helpless.
+      if (t < stunnedUntil[i]) {
+        x[i] += ix[i]
+        y[i] += iy[i]
+        ix[i] *= 0.86
+        iy[i] *= 0.86
+        if (x[i] < LO) x[i] = LO
+        if (x[i] > HI) x[i] = HI
+        if (y[i] < LO) y[i] = LO
+        if (y[i] > HI) y[i] = HI
+        continue
+      }
+
       // Retarget when the current mark is down, or on a staggered timer.
       if (target[i] < 0 || state[target[i]] !== 2 || (t + phase[i]) % 24 === 0) {
         // Sharks smell blood: closeness matters most, but a wounded opponent
@@ -295,7 +482,7 @@ export function simulate(seed, n) {
         let best = -1
         let bestD = Infinity
         for (let j = 0; j < n; j++) {
-          if (j === i || state[j] !== 2) continue
+          if (j === i || state[j] !== 2 || mode[j] === 2) continue
           const dx = x[j] - x[i]
           const dy = y[j] - y[i]
           const d = (dx * dx + dy * dy) * (hp[j] / hpMax[j] + 0.3)
@@ -322,12 +509,27 @@ export function simulate(seed, n) {
         if (dist < REACH && cool[i] <= 0) {
           const roll = 0.62 + rng() * 0.62
           const chair = chairHolder === i
-          // A crowded ring spreads the punishment thin while entries are still
-          // coming — the rumble builds instead of collapsing in waves — then
-          // the brakes come off once the field is complete and the endgame
-          // belongs to the fighting. Solo showdowns always hit at full force.
           const crowd = alive > 2 ? Math.min(1, (2.0 + 0.2 * alive) / alive) : 1
-          const dmg = roll * power[i] * dmgMul * crowd * (chair ? 2.2 : 1)
+          let dmg =
+            roll *
+            power[i] *
+            dmgMul *
+            crowd *
+            (chair ? WEAPONS[weaponKind].mult : 1) *
+            (t < rageUntil[i] ? 1.7 : 1)
+          // Anyone hit while standing next to the table goes THROUGH it.
+          let slammed = false
+          if (tableUp) {
+            const tdx = x[tg] - tablePlan.x
+            const tdy = y[tg] - tablePlan.y
+            if (tdx * tdx + tdy * tdy < 52 * 52) {
+              slammed = true
+              tableUp = false
+              tableDone = true
+              dmg *= 2.6
+              objects.push({ k: 'tslam', t, by: i, on: tg })
+            }
+          }
           hp[tg] -= dmg
           lastHitBy[tg] = i
           lastHurtT[tg] = t
@@ -339,15 +541,19 @@ export function simulate(seed, n) {
           }
           sDmg[i] += dmg
           sTaken[tg] += dmg
+          dealtSince[i] += dmg
+          takenSince[tg] += dmg
           sHits[i]++
           if (chair) {
             sChair[i] += dmg
+            if (weaponKind === 'can') stunnedUntil[tg] = t + 42
             chairSwings--
             if (chairSwings <= 0) {
               chairHolder = -2
-              objects.push({ k: 'break', t, by: i, on: tg })
+              objects.push({ k: 'break', w: weaponKind, t, by: i, on: tg })
             }
           }
+          if (slammed) sChair[i] += dmg * 0.4
           // A top-of-the-range roll, not too soon after the last one, is this
           // fighter's signature move. Derived from the roll, so it costs no rng.
           const special =
@@ -419,8 +625,6 @@ export function simulate(seed, n) {
       ix[i] *= 0.86
       iy[i] *= 0.86
 
-      if (forceEnd) hp[i] -= 2
-
       // The ropes: hit them and you bounce back in.
       if (x[i] < LO) {
         x[i] = LO
@@ -478,6 +682,7 @@ export function simulate(seed, n) {
       }
       hp[i] = 0
       state[i] = 1
+      mode[i] = 0
       koTick[i] = t
       alive--
 
@@ -496,7 +701,7 @@ export function simulate(seed, n) {
         chairOnMat = true
         chairX = Math.min(HI - 20, Math.max(LO + 20, x[i]))
         chairY = Math.min(HI - 20, Math.max(LO + 20, y[i]))
-        objects.push({ k: 'drop', t, x: chairX, y: chairY })
+        objects.push({ k: 'drop', w: weaponKind, t, x: chairX, y: chairY })
       }
 
       order.push(i)

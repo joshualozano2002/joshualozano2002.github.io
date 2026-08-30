@@ -127,6 +127,14 @@ export const sfxBuzzer = () => {
   sfxRoar(0.5)
 }
 
+/** Somebody just went through the furniture. */
+export const sfxCrash = () => {
+  noise({ dur: 0.35, gain: 0.11, freq: 900 })
+  noise({ dur: 0.22, gain: 0.08, freq: 2600, type: 'highpass', delay: 0.03 })
+  blip({ freq: 90, to: 40, dur: 0.4, type: 'triangle', gain: 0.1 })
+  sfxRoar(1.1)
+}
+
 /** The bell that starts it. */
 export const sfxBell = () => {
   ;[0, 0.28, 0.56].forEach((d) => {

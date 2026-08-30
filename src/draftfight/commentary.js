@@ -24,12 +24,22 @@ export function buildLines({ fight, fighters, n }) {
     )
   }
 
-  // Chair story.
+  // Weapons, the table, high spots, and comebacks — from the object feed.
+  const WLABEL = { chair: 'STEEL CHAIR', kendo: 'KENDO STICK', can: 'TRASH CAN' }
   for (const o of fight.objects) {
-    if (o.k === 'spawn') lines.add('A STEEL CHAIR just slid into the ring!')
-    else if (o.k === 'pick') lines.add(`${name(o.by)} has the STEEL CHAIR!`)
-    else if (o.k === 'break') lines.add(`${name(o.by)} breaks the chair over ${name(o.on)}!`)
-    else if (o.k === 'drop') lines.add('The chair is loose again!')
+    if (o.k === 'spawn') lines.add(`A ${WLABEL[o.w]} just slid into the ring!`)
+    else if (o.k === 'pick') lines.add(`${name(o.by)} has the ${WLABEL[o.w]}!`)
+    else if (o.k === 'break') {
+      if (o.w === 'chair') lines.add(`${name(o.by)} breaks the chair over ${name(o.on)}!`)
+      else if (o.w === 'kendo')
+        lines.add(`${name(o.by)} snaps the kendo stick across ${name(o.on)}'s back!`)
+      else lines.add(`${name(o.by)} flattens the trash can over ${name(o.on)}'s head!`)
+    } else if (o.k === 'drop') lines.add(`The ${WLABEL[o.w].toLowerCase()} is loose again!`)
+    else if (o.k === 'tspawn')
+      lines.add('A TABLE has been set up in the ring. This will end badly for someone.')
+    else if (o.k === 'tslam') lines.add(`${name(o.by)} puts ${name(o.on)} THROUGH THE TABLE!!`)
+    else if (o.k === 'dive') lines.add(`${name(o.by)} FROM THE TOP ROPE!!`)
+    else if (o.k === 'rage') lines.add(`${name(o.by)} is FEELING IT — the comeback is on!`)
   }
 
   // Hang-ons and the feud.

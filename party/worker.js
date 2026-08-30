@@ -28,7 +28,7 @@ const CORS = {
 }
 
 async function lineId(voice, text) {
-  const data = new TextEncoder().encode(`${voice}|${TTS_MODEL}|${text}`)
+  const data = new TextEncoder().encode(`v2|${voice}|${TTS_MODEL}|${text}`)
   const hash = await crypto.subtle.digest('SHA-256', data)
   return [...new Uint8Array(hash)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
@@ -82,7 +82,7 @@ async function handleTts(request, env, url) {
             body: JSON.stringify({
               text,
               model_id: TTS_MODEL,
-              voice_settings: { stability: 0.35, similarity_boost: 0.7, style: 0.55 },
+              voice_settings: { stability: 0.2, similarity_boost: 0.75, style: 0.9 },
             }),
           },
         )

@@ -17,23 +17,59 @@ export function drawShadow(ctx, rx, ry, alpha = 0.4) {
   ctx.fill()
 }
 
-/** A folding steel chair, ringside's favourite equalizer. */
-export function drawChair(ctx, u = 3, held = false) {
+/** The arsenal: chair, kendo stick, trash can — on the mat or raised. */
+export function drawWeapon(ctx, kind, u = 3, held = false) {
   ctx.save()
   const r = (x, y, w, h, c) => {
     ctx.fillStyle = c
     ctx.fillRect(x * u, y * u, w * u, h * u)
   }
-  if (held) {
-    // Raised overhead, seen edge-on.
-    r(-3.2, -1.2, 6.4, 1.3, '#aeb9c6')
-    r(-3.2, -2.6, 1.1, 1.5, '#8792a1')
-    r(2.1, -2.6, 1.1, 1.5, '#8792a1')
+  if (kind === 'kendo') {
+    if (held) {
+      r(-5.5, -1.4, 11, 0.9, '#d8b06a')
+      r(-5.5, -1.6, 1.6, 1.3, '#8a5a28')
+    } else {
+      r(-5.5, -1.2, 11, 0.9, '#d8b06a')
+      r(-5.5, -1.4, 1.6, 1.3, '#8a5a28')
+    }
+  } else if (kind === 'can') {
+    r(-2.2, held ? -4.6 : -5.4, 4.4, held ? 4.2 : 5, '#8792a1')
+    r(-2.5, held ? -5.2 : -6, 5, 0.9, '#aeb9c6')
+    r(-1.6, held ? -3.4 : -4.2, 0.7, 2.4, '#6b7684')
+    r(0.9, held ? -3.4 : -4.2, 0.7, 2.4, '#6b7684')
   } else {
-    r(-2.6, -6.2, 5.2, 3.4, '#aeb9c6') // backrest
-    r(-2.6, -3, 5.2, 1.1, '#8792a1') // seat
-    r(-2.4, -1.9, 0.9, 1.9, '#6b7684') // legs
-    r(1.5, -1.9, 0.9, 1.9, '#6b7684')
+    // The steel chair.
+    if (held) {
+      r(-3.2, -1.2, 6.4, 1.3, '#aeb9c6')
+      r(-3.2, -2.6, 1.1, 1.5, '#8792a1')
+      r(2.1, -2.6, 1.1, 1.5, '#8792a1')
+    } else {
+      r(-2.6, -6.2, 5.2, 3.4, '#aeb9c6')
+      r(-2.6, -3, 5.2, 1.1, '#8792a1')
+      r(-2.4, -1.9, 0.9, 1.9, '#6b7684')
+      r(1.5, -1.9, 0.9, 1.9, '#6b7684')
+    }
+  }
+  ctx.restore()
+}
+
+/** The table — standing, or in two sad halves. */
+export function drawTable(ctx, u = 3, broken = false) {
+  ctx.save()
+  const r = (x, y, w, h, c) => {
+    ctx.fillStyle = c
+    ctx.fillRect(x * u, y * u, w * u, h * u)
+  }
+  if (broken) {
+    r(-7, -1.4, 6, 1.2, '#9a7442')
+    r(1, -1.4, 6, 1.2, '#9a7442')
+    r(-5.5, -2.6, 1, 1.4, '#7a5a32')
+    r(4.5, -2.6, 1, 1.4, '#7a5a32')
+  } else {
+    r(-6.5, -4.2, 13, 1.4, '#b08a50') // top
+    r(-6.5, -4.6, 13, 0.6, '#c9a468')
+    r(-5.6, -2.8, 1.1, 2.8, '#7a5a32') // legs
+    r(4.5, -2.8, 1.1, 2.8, '#7a5a32')
   }
   ctx.restore()
 }

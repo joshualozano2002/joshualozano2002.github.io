@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
-import { drawChair, drawRef, drawShadow, drawThrowable, drawWrestler } from './sprite.js'
-import { sfxBell, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, sfxWin } from './sound.js'
+import { drawRef, drawShadow, drawTable, drawThrowable, drawWeapon, drawWrestler } from './sprite.js'
+import { sfxBell, sfxChair, sfxChant, sfxCrash, sfxElim, sfxEntrance, sfxHit, sfxRoar, sfxSpecial, sfxWin } from './sound.js'
 
 /**
  * Plays back a finished simulation as a wrestling broadcast.
@@ -47,6 +47,8 @@ const proj = (x, y) => {
 }
 
 const POWS = ['POW!', 'BAM!', 'WHAM!', 'SMACK!', 'THUD!']
+const WLABEL = { chair: 'STEEL CHAIR', kendo: 'KENDO STICK', can: 'TRASH CAN' }
+const WPOW = { chair: 'CLANG!', kendo: 'THWACK!', can: 'DONK!' }
 const ROPES = [
   { h: 26, c: '#4fd6ea' },
   { h: 46, c: '#8ea0b4' },
@@ -162,7 +164,10 @@ export default function Arena({
       streak: new Array(n).fill(0), // consecutive hits landed without taking one
       onFire: new Array(n).fill(false),
       obj: 0, // pointer into the chair event feed
-      chair: { mode: 'none', x: 0, y: 0, fx: 0, fy: 0, t0: 0, by: -1 },
+      chair: { mode: 'none', kind: 'chair', x: 0, y: 0, fx: 0, fy: 0, t0: 0, by: -1 },
+      table: null, // {x, y, brokenAt}
+      stars: new Array(n).fill(0), // seeing-stars until (ms clock)
+      rageGlow: new Array(n).fill(0),
       belled: false,
     }
 
@@ -295,7 +300,7 @@ export default function Arena({
                 x: h.x,
                 y: h.y,
                 life: 0,
-                txt: 'CLANG!',
+                txt: WPOW[run.chair.kind] ?? 'CLANG!',
                 silver: true,
                 rot: (Math.random() - 0.5) * 0.4,
               })
@@ -316,23 +321,53 @@ export default function Arena({
         while (run.obj < objects.length && objects[run.obj].t <= t0) {
           const o = objects[run.obj++]
           const ch = run.chair
+          const recent = t0 - o.t <= 45
           if (o.k === 'spawn') {
-            Object.assign(ch, { mode: 'sliding', x: o.x, y: o.y, fx: o.fx, fy: o.fy, t0: o.t })
-            if (t0 - o.t <= 45) say('A STEEL CHAIR just slid into the ring!')
+            Object.assign(ch, {
+              mode: 'sliding', kind: o.w, x: o.x, y: o.y, fx: o.fx, fy: o.fy, t0: o.t,
+            })
+            if (recent) say(`A ${WLABEL[o.w]} just slid into the ring!`)
           } else if (o.k === 'pick') {
             ch.mode = 'held'
             ch.by = o.by
-            if (t0 - o.t <= 45) say(`${fighters[o.by].name} has the STEEL CHAIR!`)
+            if (recent) say(`${fighters[o.by].name} has the ${WLABEL[o.w]}!`)
           } else if (o.k === 'break') {
             ch.mode = 'none'
             ch.by = -1
-            if (t0 - o.t <= 45) {
-              say(`${fighters[o.by].name} breaks the chair over ${fighters[o.on].name}!`)
+            if (recent) {
+              if (o.w === 'chair')
+                say(`${fighters[o.by].name} breaks the chair over ${fighters[o.on].name}!`)
+              else if (o.w === 'kendo')
+                say(`${fighters[o.by].name} snaps the kendo stick across ${fighters[o.on].name}'s back!`)
+              else say(`${fighters[o.by].name} flattens the trash can over ${fighters[o.on].name}'s head!`)
+              if (o.w === 'can') run.stars[o.on] = now + 1400
               if (soundRef.current) sfxChair(true)
             }
           } else if (o.k === 'drop') {
             Object.assign(ch, { mode: 'mat', x: o.x, y: o.y, by: -1 })
-            if (t0 - o.t <= 45) say('The chair is loose again!')
+            if (recent) say(`The ${WLABEL[o.w].toLowerCase()} is loose again!`)
+          } else if (o.k === 'tspawn') {
+            run.table = { x: o.x, y: o.y, brokenAt: 0 }
+            if (recent) say('A TABLE has been set up in the ring. This will end badly for someone.')
+          } else if (o.k === 'tslam') {
+            if (run.table) run.table.brokenAt = now
+            if (recent) {
+              say(`${fighters[o.by].name} puts ${fighters[o.on].name} THROUGH THE TABLE!!`)
+              run.special = { at: now, text: 'THROUGH THE TABLE!', color: '#ffd88a' }
+              run.shake = 22
+              if (soundRef.current) sfxCrash()
+            }
+          } else if (o.k === 'dive') {
+            if (recent) {
+              say(`${fighters[o.by].name} FROM THE TOP ROPE!!`)
+              run.sparks.push({ x: o.x, y: o.y, life: 0, p: 2.4 })
+              run.pows.push({ x: o.x, y: o.y, life: 0, txt: 'SPLASH!', rot: 0 })
+              run.shake = 20
+              if (soundRef.current) sfxSpecial()
+            }
+          } else if (o.k === 'rage') {
+            run.rageGlow[o.by] = now + 5000
+            if (recent) say(`${fighters[o.by].name} is FEELING IT — the comeback is on!`)
           }
         }
         while (run.save < saves.length && saves[run.save].t <= t0) {
@@ -665,7 +700,7 @@ export default function Arena({
           if (st === 0) continue // backstage, waiting on the buzzer
           const wx = at(px, t0, i) * (1 - a) + at(px, t1, i) * a
           const wy = at(py, t0, i) * (1 - a) + at(py, t1, i) * a
-          ;(st === 2 ? inRing : outside).push({ i, st, wx, wy })
+          ;(st === 2 || st === 4 || st === 5 ? inRing : outside).push({ i, st, wx, wy })
         }
       }
       // Before the entrances begin, the ring stands empty under the lights.
@@ -739,6 +774,43 @@ export default function Arena({
           return
         }
 
+        // On the ropes or in the air: the high-spot states.
+        if (st === 4 || st === 5) {
+          let z = 0
+          let pose = 'walk'
+          if (st === 4) {
+            // Climbing: rise as the corner gets close, then perch up top.
+            let cd = Infinity
+            for (const [cx2, cy2] of [
+              [RING_MIN + 6, RING_MIN + 6],
+              [RING_MAX - 6, RING_MIN + 6],
+              [RING_MAX - 6, RING_MAX - 6],
+              [RING_MIN + 6, RING_MAX - 6],
+            ]) {
+              const ddx = wx - cx2
+              const ddy = wy - cy2
+              cd = Math.min(cd, Math.sqrt(ddx * ddx + ddy * ddy))
+            }
+            z = Math.max(0, 46 - cd) * 1.6
+            pose = cd < 10 ? 'win' : 'walk'
+          } else {
+            z = 52
+            pose = 'punch'
+          }
+          const mdx = at(px, t1, i) - at(px, t0, i)
+          if (Math.abs(mdx) > 0.3) run.facing[i] = mdx > 0 ? 1 : -1
+          ctx.save()
+          ctx.translate(X, Y + 20 * d)
+          drawShadow(ctx, 15 * d, 5 * d, 0.3)
+          ctx.restore()
+          ctx.save()
+          ctx.translate(X, Y + 20 * d - z * d)
+          drawWrestler(ctx, f.pal, pose, animFrame + i, run.facing[i], u)
+          ctx.restore()
+          outlined(f.short, X, Y + 32 * d, 14, 'rgba(226,233,240,0.92)')
+          return
+        }
+
         // Alive. Choose pose from the recent event record.
         const isWinner = finished && i === winner
         let pose = 'idle'
@@ -795,6 +867,37 @@ export default function Arena({
           }
         }
 
+        // Running hot: the comeback glow.
+        if (run.rageGlow[i] > now && !reduced) {
+          ctx.save()
+          ctx.globalAlpha = 0.3 + 0.2 * Math.sin(now / 90)
+          ctx.translate(X, Y + 20 * d)
+          drawWrestler(
+            ctx,
+            { ...f.pal, skin: '#ffd88a', trunks: '#ff9d2e', hair: '#ffd88a', boots: '#ff9d2e', band: '#fff', shade: '#ff9d2e' },
+            pose,
+            animFrame + i,
+            run.facing[i],
+            u,
+          )
+          ctx.restore()
+          ctx.globalAlpha = 1
+        }
+
+        // Seeing stars after a trash-can shot.
+        if (run.stars[i] > now) {
+          for (let k = 0; k < 3; k++) {
+            const ang = now / 260 + (k * TAU) / 3
+            outlined(
+              '★',
+              X + Math.cos(ang) * 16 * d,
+              Y - 66 * d + Math.sin(ang) * 5 * d,
+              13,
+              '#ffd88a',
+            )
+          }
+        }
+
         // Hit flash on whoever just took one.
         if (t0 - run.lastDef[i] < 3 && !reduced) {
           ctx.save()
@@ -832,7 +935,20 @@ export default function Arena({
         outlined(f.short, X, Y + 32 * d, 14, isWinner ? '#ffd88a' : 'rgba(226,233,240,0.92)')
       }
 
-      // The chair on the mat (or sliding in), under the fighters' feet.
+      // The table, standing or in pieces, under everything.
+      if (run.table) {
+        const [X, Y, d] = proj(run.table.x, run.table.y)
+        const broken = run.table.brokenAt > 0
+        if (!broken || now - run.table.brokenAt < 6000) {
+          ctx.save()
+          ctx.translate(X, Y + 10 * d)
+          drawShadow(ctx, 22 * d, 6 * d, 0.3)
+          drawTable(ctx, 3.4 * d, broken)
+          ctx.restore()
+        }
+      }
+
+      // The weapon on the mat (or sliding in), under the fighters' feet.
       if (run.chair.mode === 'sliding' || run.chair.mode === 'mat') {
         const ch = run.chair
         let cx_ = ch.x
@@ -856,7 +972,7 @@ export default function Arena({
           ctx.lineWidth = 1.5
           ctx.stroke()
         }
-        drawChair(ctx, 3.2 * d)
+        drawWeapon(ctx, run.chair.kind, 3.2 * d)
         ctx.restore()
       }
 
@@ -876,7 +992,7 @@ export default function Arena({
             Y + (swinging ? -46 * d : -20 * d),
           )
           ctx.scale(run.facing[hb], 1)
-          drawChair(ctx, 3 * d, true)
+          drawWeapon(ctx, run.chair.kind, 3 * d, true)
           ctx.restore()
         }
       }
