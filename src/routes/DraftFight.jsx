@@ -4,7 +4,7 @@ import { Label, Lamp } from '../components/ui'
 import Arena, { introDurationMs } from '../draftfight/Arena'
 import { drawWrestler } from '../draftfight/sprite'
 import { POSTER_H, POSTER_W, renderPoster } from '../draftfight/poster'
-import { MAX_MANAGERS, MIN_MANAGERS, fightHash, readHash } from '../draftfight/codec'
+import { MAX_MANAGERS, MIN_MANAGERS, fightHash, readHash, readSetupHash } from '../draftfight/codec'
 import { buildFighters } from '../draftfight/roster'
 import { simulate } from '../draftfight/sim'
 import { newSeed } from '../draftfight/rng'
@@ -107,11 +107,21 @@ function SpriteAvatar({ fighter, pose = 'idle', size = 56 }) {
 
 /* ------------------------------------------------------------------ setup */
 
-function Setup({ onStart }) {
-  const [league, setLeague] = useState('')
-  const [size, setSize] = useState(12)
-  const [names, setNames] = useState(() => Array(12).fill(''))
-  const [champ, setChamp] = useState(-1)
+function Setup({ onStart, initial }) {
+  const initSize = Math.min(
+    MAX_MANAGERS,
+    Math.max(MIN_MANAGERS, initial?.managers?.length ?? 12),
+  )
+  const [league, setLeague] = useState(initial?.league ?? '')
+  const [size, setSize] = useState(initSize)
+  const [names, setNames] = useState(() => {
+    const base = Array(initSize).fill('')
+    initial?.managers?.slice(0, initSize).forEach((m, i) => {
+      base[i] = m
+    })
+    return base
+  })
+  const [champ, setChamp] = useState(initial?.champ ?? -1)
   const [mode, setMode] = useState('live')
   const [bell, setBell] = useState(defaultBellValue)
   const [error, setError] = useState('')
@@ -350,6 +360,7 @@ function Board({ n, fighters, revealed, compact = false }) {
 
 export default function DraftFight() {
   const [spec, setSpec] = useState(null)
+  const [prefill, setPrefill] = useState(null)
   const [phase, setPhase] = useState('setup') // setup · lobby · live · done
   const [revealed, setRevealed] = useState({})
   const [hud, setHud] = useState({ secs: 0, alive: 0 })
@@ -404,6 +415,7 @@ export default function DraftFight() {
         }
       } else {
         setSpec(null)
+        setPrefill(readSetupHash(window.location.hash))
         setPhase('setup')
       }
     }
@@ -678,7 +690,7 @@ export default function DraftFight() {
                 floor: first one out picks last, last one standing picks first. One link, and the
                 whole league watches the same fight, hit for hit.
               </p>
-              <Setup onStart={publish} />
+              <Setup key={prefill ? 'pre' : 'blank'} initial={prefill} onStart={publish} />
             </>
           ) : null}
 

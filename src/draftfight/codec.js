@@ -84,3 +84,35 @@ export function readHash(hash = '') {
 }
 
 export const fightHash = (fight) => `#${HASH_KEY}=${encodeFight(fight)}`
+
+/**
+ * Setup prefill: `#s=...` opens the CREATE FORM with fields filled in, but
+ * mints nothing — whoever presses Schedule on their own device rolls the seed
+ * and becomes the commissioner. Lets someone hand the commissioner a
+ * ready-to-fire form without taking the crown from them.
+ */
+export function encodeSetup({ league, champ = -1, managers }) {
+  return toBase64Url(new TextEncoder().encode(JSON.stringify([league, champ, ...managers])))
+}
+
+export function decodeSetup(token) {
+  try {
+    const payload = JSON.parse(new TextDecoder().decode(fromBase64Url(token)))
+    if (!Array.isArray(payload) || payload.length < 3) return null
+    const [league, champ, ...managers] = payload
+    return {
+      league: String(league ?? ''),
+      champ: Number.isInteger(champ) ? champ : -1,
+      managers: managers.slice(0, MAX_MANAGERS).map((m) => String(m)),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function readSetupHash(hash = '') {
+  const raw = String(hash).replace(/^#/, '')
+  if (!raw) return null
+  const token = new URLSearchParams(raw).get('s')
+  return token ? decodeSetup(token) : null
+}
