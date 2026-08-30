@@ -354,14 +354,16 @@ export default function DraftFight() {
   const [revealed, setRevealed] = useState({})
   const [hud, setHud] = useState({ secs: 0, alive: 0 })
   const [speed, setSpeed] = useState(1)
-  const [sound, setSound] = useState(false)
-  const [voice, setVoice] = useState(false)
+  const [sound, setSound] = useState(true)
+  const [voice, setVoice] = useState(true)
   const voiceRef = useRef(false)
   voiceRef.current = voice
   const [playing, setPlaying] = useState(false)
   const [runKey, setRunKey] = useState(0)
   const [href, setHref] = useState('')
   const [replay, setReplay] = useState(false) // aired live fight, watched again
+  const [isMine, setIsMine] = useState(false) // created on this device: commissioner controls
+  const [primed, setPrimed] = useState(false) // browsers unlock audio on the first tap
   const [, setTick] = useState(0) // re-render pulse for the countdown
   const [feed, setFeed] = useState([]) // broadcast-booth lines, newest first
   const feedId = useRef(0)
@@ -370,6 +372,17 @@ export default function DraftFight() {
   // One shared clock for everyone watching a scheduled fight.
   useEffect(() => {
     syncClock()
+  }, [])
+
+  // Browsers refuse to start audio until the person touches the page once.
+  // Sound and voice default on, so the very first tap anywhere unlocks them.
+  useEffect(() => {
+    const unlock = () => {
+      primeAudio()
+      setPrimed(true)
+    }
+    window.addEventListener('pointerdown', unlock, { once: true })
+    return () => window.removeEventListener('pointerdown', unlock)
   }, [])
 
   // An invite link carries the whole fight in its fragment.
@@ -384,6 +397,11 @@ export default function DraftFight() {
         setFeed([])
         setHud({ secs: 0, alive: parsed.managers.length })
         setHref(window.location.href)
+        try {
+          setIsMine(localStorage.getItem(`df-mine-${parsed.seed}`) === '1')
+        } catch {
+          setIsMine(false)
+        }
       } else {
         setSpec(null)
         setPhase('setup')
@@ -413,6 +431,13 @@ export default function DraftFight() {
     setRevealed({})
     setReplay(false)
     setFeed([])
+    // Whoever mints the link on this device is its commissioner.
+    try {
+      localStorage.setItem(`df-mine-${next.seed}`, '1')
+    } catch {
+      /* private mode: the crown just doesn't survive a reload */
+    }
+    setIsMine(true)
     setPhase('lobby')
     setPlaying(false)
     setSpeed(1)
@@ -493,6 +518,16 @@ export default function DraftFight() {
       /* private mode: the pick just won't survive a reload */
     }
   }
+
+  // With voice on by default, warm the real announcer as soon as the fight is
+  // known. The worker caches every clip, so a league shares one generation.
+  const preparedFor = useRef(null)
+  useEffect(() => {
+    if (!spec || !fight || !fighters || !announcerConfigured()) return
+    if (preparedFor.current === spec.seed) return
+    preparedFor.current = spec.seed
+    prepareAnnouncer(buildLines({ fight, fighters, n: fighters.length }))
+  }, [spec, fight, fighters])
 
   /** Broadcast position: ms since the bell, on the skew-corrected clock. */
   const liveClock = useCallback(() => sharedNow() - spec.startAt, [spec])
@@ -649,6 +684,11 @@ export default function DraftFight() {
 
           {spec && fight && fighters ? (
             <div className="mt-2">
+              {!primed && (sound || voice) && phase !== 'setup' ? (
+                <p className="readout mb-4 inline-block rounded-xs border border-amber/50 bg-amber/10 px-3 py-2 text-[11px] tracking-[0.14em] text-amber">
+                  🔊 SOUND IS ON — TAP ANYWHERE ONCE TO UNLOCK IT
+                </p>
+              ) : null}
               {phase === 'lobby' ? (
                 <>
                   <h1 className="font-display text-4xl font-bold tracking-tight text-balance sm:text-5xl">
@@ -807,18 +847,22 @@ export default function DraftFight() {
                         VOICE {voice ? 'ON' : 'OFF'}
                       </button>
                     ) : null}
-                    <button
-                      type="button"
-                      onClick={() => publish({ ...spec, seed: newSeed() })}
-                      className="readout rounded-xs border border-hairline px-4 py-3 text-[11px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
-                    >
-                      RE-ROLL FIGHT
-                    </button>
+                    {isMine ? (
+                      <button
+                        type="button"
+                        onClick={() => publish({ ...spec, seed: newSeed() })}
+                        className="readout rounded-xs border border-hairline px-4 py-3 text-[11px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
+                      >
+                        RE-ROLL FIGHT
+                      </button>
+                    ) : null}
                   </div>
-                  <p className="mt-3 text-xs text-mute">
-                    Re-rolling makes a different fight and a different link. Do it before you send
-                    the invite, not after.
-                  </p>
+                  {isMine ? (
+                    <p className="mt-3 text-xs text-mute">
+                      Re-rolling makes a different fight and a different link. Do it before you
+                      send the invite, not after.
+                    </p>
+                  ) : null}
                 </>
               ) : null}
 
@@ -1051,13 +1095,15 @@ export default function DraftFight() {
                           >
                             {spec.startAt ? 'WATCH THE REPLAY' : 'WATCH AGAIN'}
                           </button>
-                          <button
-                            type="button"
-                            onClick={() => publish({ ...spec, seed: newSeed(), startAt: 0 })}
-                            className="readout rounded-xs border border-amber/60 px-3 py-2 text-[11px] tracking-[0.16em] text-amber hover:bg-amber/10"
-                          >
-                            NEW FIGHT · NEW LINK
-                          </button>
+                          {isMine ? (
+                            <button
+                              type="button"
+                              onClick={() => publish({ ...spec, seed: newSeed(), startAt: 0 })}
+                              className="readout rounded-xs border border-amber/60 px-3 py-2 text-[11px] tracking-[0.16em] text-amber hover:bg-amber/10"
+                            >
+                              NEW FIGHT · NEW LINK
+                            </button>
+                          ) : null}
                         </div>
                         <p className="mt-5 text-xs text-mute">
                           {spec.startAt
