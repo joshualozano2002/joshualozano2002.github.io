@@ -166,6 +166,11 @@ export default function Arena({
       obj: 0, // pointer into the chair event feed
       chair: { mode: 'none', kind: 'chair', x: 0, y: 0, fx: 0, fy: 0, t0: 0, by: -1 },
       table: null, // {x, y, brokenAt}
+      cam: { x: 500, y: 415, s: 1 }, // the hard cam, drifting with the story
+      camPunch: null, // {x, y, s, until} — a cut to the moment
+      flash: 0, // white impact frame until (ms)
+      pyro: [], // celebration + debris particles
+      showOffs: new Array(n).fill(0), // he's-got-the-weapon beat until (ms)
       stars: new Array(n).fill(0), // seeing-stars until (ms clock)
       rageGlow: new Array(n).fill(0),
       belled: false,
@@ -330,7 +335,15 @@ export default function Arena({
           } else if (o.k === 'pick') {
             ch.mode = 'held'
             ch.by = o.by
-            if (recent) say(`${fighters[o.by].name} has the ${WLABEL[o.w]}!`)
+            if (recent) {
+              say(`${fighters[o.by].name} has the ${WLABEL[o.w]}!`)
+              run.showOffs[o.by] = now + 560
+              const [PX, PY] = proj(
+                at(px, Math.min(o.t, ticks - 1), o.by),
+                at(py, Math.min(o.t, ticks - 1), o.by),
+              )
+              run.camPunch = { x: PX, y: PY, s: 1.18, until: now + 750 }
+            }
           } else if (o.k === 'break') {
             ch.mode = 'none'
             ch.by = -1
@@ -355,6 +368,16 @@ export default function Arena({
               say(`${fighters[o.by].name} puts ${fighters[o.on].name} THROUGH THE TABLE!!`)
               run.special = { at: now, text: 'THROUGH THE TABLE!', color: '#ffd88a' }
               run.shake = 22
+              run.flash = now + 160
+              if (run.table) {
+                const [PX, PY] = proj(run.table.x, run.table.y)
+                run.camPunch = { x: PX, y: PY, s: 1.26, until: now + 900 }
+                for (let k = 0; k < 16; k++)
+                  run.pyro.push({
+                    x: run.table.x, y: run.table.y, vx: (Math.random() - 0.5) * 7,
+                    vy: -3 - Math.random() * 5, c: k % 2 ? '#b08a50' : '#7a5a32', life: 0,
+                  })
+              }
               if (soundRef.current) sfxCrash()
             }
           } else if (o.k === 'dive') {
@@ -363,6 +386,9 @@ export default function Arena({
               run.sparks.push({ x: o.x, y: o.y, life: 0, p: 2.4 })
               run.pows.push({ x: o.x, y: o.y, life: 0, txt: 'SPLASH!', rot: 0 })
               run.shake = 20
+              run.flash = now + 140
+              const [PX, PY] = proj(o.x, o.y)
+              run.camPunch = { x: PX, y: PY, s: 1.24, until: now + 800 }
               if (soundRef.current) sfxSpecial()
             }
           } else if (o.k === 'rage') {
@@ -393,6 +419,9 @@ export default function Arena({
           if (t0 - e.t <= 45) {
             run.banner = { at: now, e }
             run.shake = 17
+            run.flash = now + 120
+            const [PX, PY] = proj(e.x, e.y)
+            run.camPunch = { x: PX, y: PY, s: 1.2, until: now + 700 }
             if (soundRef.current) sfxElim()
             const loser = fighters[e.id].name
             if (fighters[e.id].champ) say(`THE CHAMP IS GONE — ${loser} loses Pick 1!`)
@@ -510,30 +539,63 @@ export default function Arena({
 
       ctx.fillStyle = '#04060a'
       ctx.fillRect(-40, -40, 1080, VIEW_H + 80)
+      const inIntroPre = run.elapsed < 0 && run.elapsed >= -introMs
 
-      // FINAL TWO: the camera leans in on the survivors.
-      const wantZoom = aliveNow === 2 && !finished && run.elapsed >= 0 ? 1 : 0
-      run.zoom += (wantZoom - run.zoom) * Math.min(1, dt / 500)
-      ctx.save()
-      if (run.zoom > 0.01) {
-        let zx = 0
-        let zy = 0
+      // The camera. A hard cam that leans with the story: drifting toward the
+      // action, punching in on the big moments, tight on the final two, and
+      // following whoever is airborne. Cosmetic only — it reads the timeline,
+      // it never touches it.
+      {
+        let tx = 500
+        let ty = 400
+        let ts = 1
         let cnt = 0
+        let diver = -1
         for (let i = 0; i < n; i++) {
-          if (at(state, t0, i) !== 2) continue
+          const st = at(state, t0, i)
+          if (st === 5) diver = i
+          if (st !== 2) continue
           const [X, Y] = proj(at(px, t0, i), at(py, t0, i))
-          zx += X
-          zy += Y
+          tx = cnt === 0 ? X : tx + X
+          ty = cnt === 0 ? Y : ty + Y
           cnt++
         }
         if (cnt > 0) {
-          zx /= cnt
-          zy /= cnt
-          const zs = 1 + 0.16 * run.zoom
-          ctx.translate(zx, zy)
-          ctx.scale(zs, zs)
-          ctx.translate(-zx, -zy)
+          tx /= cnt
+          ty /= cnt
+          ts = 1.05
         }
+        if (aliveNow === 2 && !finished && run.elapsed >= 0) ts = 1.16
+        if (diver >= 0) {
+          const [DX, DY] = proj(at(px, t0, diver), at(py, t0, diver))
+          tx = DX
+          ty = DY
+          ts = 1.2
+        }
+        if (run.camPunch && now < run.camPunch.until) {
+          tx = run.camPunch.x
+          ty = run.camPunch.y
+          ts = run.camPunch.s
+        }
+        if (run.elapsed < 0 && !inIntroPre) {
+          ts = 1
+          tx = 500
+          ty = 400
+        }
+        const k = run.camPunch && now < run.camPunch.until ? Math.min(1, dt / 150) : Math.min(1, dt / 650)
+        run.cam.x += (tx - run.cam.x) * k
+        run.cam.y += (ty - run.cam.y) * k
+        run.cam.s += (ts - run.cam.s) * k
+        // Never let the lens wander past the frame.
+        const off = 500 * (1 - 1 / run.cam.s) + 30
+        run.cam.x = Math.min(500 + off, Math.max(500 - off, run.cam.x))
+        run.cam.y = Math.min(400 + off, Math.max(400 - off, run.cam.y))
+      }
+      ctx.save()
+      if (run.cam.s > 1.005) {
+        ctx.translate(run.cam.x, run.cam.y)
+        ctx.scale(run.cam.s, run.cam.s)
+        ctx.translate(-run.cam.x, -run.cam.y)
       }
 
       // House lights: two beams crossing on the ring.
@@ -717,6 +779,12 @@ export default function Arena({
             ? `And finally — defending Pick 1 — ${f.name}, ${f.callsign}!`
             : `Here comes ${f.name} — ${f.callsign}!`,
         )
+        if (!reduced)
+          for (let k = 0; k < 14; k++)
+            run.pyro.push({
+              x: 500 + (Math.random() - 0.5) * 40, y: 44, vx: (Math.random() - 0.5) * 5,
+              vy: -2 - Math.random() * 4.5, c: k % 3 ? '#ffd88a' : '#ff9d2e', life: 0,
+            })
         if (soundRef.current) sfxEntrance(entranceIdx + (f.champ ? 5 : 0))
       }
 
@@ -815,6 +883,7 @@ export default function Arena({
         const isWinner = finished && i === winner
         let pose = 'idle'
         if (isWinner) pose = 'win'
+        else if (run.showOffs[i] > now) pose = 'win' // presenting the hardware
         else if (t0 - run.lastDef[i] < 7) pose = 'hurt'
         else if (t0 - run.lastAtk[i] < 6) pose = 'punch'
         else {
@@ -978,22 +1047,37 @@ export default function Arena({
 
       for (const fgt of inRing) drawOne(fgt)
 
-      // The chair in somebody's hands, raised when they swing.
+      // The weapon in somebody's hands: held high for the crowd the moment
+      // it's picked up, then raised only when they swing.
       if (run.chair.mode === 'held' && run.chair.by >= 0) {
         const hb = run.chair.by
         if (at(state, t0, hb) === 2) {
           const hx = at(px, t0, hb) * (1 - a) + at(px, t1, hb) * a
           const hy = at(py, t0, hb) * (1 - a) + at(py, t1, hb) * a
           const [X, Y, d] = proj(hx, hy)
-          const swinging = t0 - run.lastAtk[hb] < 6
-          ctx.save()
-          ctx.translate(
-            X + (swinging ? 14 * d * run.facing[hb] : 11 * d * run.facing[hb]),
-            Y + (swinging ? -46 * d : -20 * d),
-          )
-          ctx.scale(run.facing[hb], 1)
-          drawWeapon(ctx, run.chair.kind, 3 * d, true)
-          ctx.restore()
+          if (run.showOffs[hb] > now) {
+            ctx.save()
+            ctx.translate(X, Y - 72 * d)
+            if (!reduced) {
+              ctx.beginPath()
+              ctx.arc(0, 0, (16 + ((now / 70) % 10)) * d, 0, TAU)
+              ctx.strokeStyle = `rgba(255,216,138,${0.5 - ((now / 70) % 10) * 0.04})`
+              ctx.lineWidth = 2
+              ctx.stroke()
+            }
+            drawWeapon(ctx, run.chair.kind, 3.2 * d)
+            ctx.restore()
+          } else {
+            const swinging = t0 - run.lastAtk[hb] < 6
+            ctx.save()
+            ctx.translate(
+              X + (swinging ? 14 * d * run.facing[hb] : 11 * d * run.facing[hb]),
+              Y + (swinging ? -46 * d : -20 * d),
+            )
+            ctx.scale(run.facing[hb], 1)
+            drawWeapon(ctx, run.chair.kind, 3 * d, true)
+            ctx.restore()
+          }
         }
       }
 
@@ -1006,8 +1090,10 @@ export default function Arena({
       for (const fgt of outside) drawOne(fgt)
 
       // FINAL TWO: house lights down, spotlights up on the survivors.
-      if (run.zoom > 0.25) {
-        ctx.fillStyle = `rgba(2,4,8,${0.32 * run.zoom})`
+      const duel = aliveNow === 2 && !finished && run.elapsed >= 0 ? 1 : 0
+      run.duelK = (run.duelK ?? 0) + (duel - (run.duelK ?? 0)) * Math.min(1, dt / 500)
+      if (run.duelK > 0.25) {
+        ctx.fillStyle = `rgba(2,4,8,${0.32 * run.duelK})`
         ctx.fillRect(-80, -80, 1160, VIEW_H + 160)
         for (const fgt of inRing) {
           const [X, Y, d] = proj(fgt.wx, fgt.wy)
@@ -1017,7 +1103,7 @@ export default function Arena({
           ctx.lineTo(X + 55 * d, Y + 22 * d)
           ctx.lineTo(X - 55 * d, Y + 22 * d)
           ctx.closePath()
-          ctx.fillStyle = `rgba(255,225,160,${0.12 * run.zoom})`
+          ctx.fillStyle = `rgba(255,225,160,${0.12 * run.duelK})`
           ctx.fill()
           drawOne(fgt)
         }
@@ -1075,6 +1161,24 @@ export default function Arena({
           drawThrowable(ctx, sp.kind, 3 * d)
         }
         ctx.restore()
+        ctx.globalAlpha = 1
+      }
+
+      // Pyro and debris.
+      for (let i = run.pyro.length - 1; i >= 0; i--) {
+        const p = run.pyro[i]
+        p.life += dt / 950
+        if (p.life >= 1) {
+          run.pyro.splice(i, 1)
+          continue
+        }
+        p.x += p.vx * (dt / 16.7)
+        p.y += p.vy * (dt / 16.7)
+        p.vy += 0.28 * (dt / 16.7)
+        const [X, Y, d] = proj(p.x, p.y)
+        ctx.globalAlpha = 1 - p.life
+        ctx.fillStyle = p.c
+        ctx.fillRect(X - 2.4 * d, Y - 2.4 * d, 4.8 * d, 4.8 * d)
         ctx.globalAlpha = 1
       }
 
@@ -1304,6 +1408,20 @@ export default function Arena({
       // Screen dressing, in device pixels so the lines stay crisp.
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
       const H = size * (VIEW_H / 1000)
+      // Impact frame: a heartbeat of white on the biggest hits.
+      if (run.flash > now && !reduced) {
+        ctx.fillStyle = `rgba(240,246,255,${Math.min(0.3, Math.max(0, ((run.flash - now) / 160) * 0.3))})`
+        ctx.fillRect(0, 0, size, H)
+      }
+      // Cinema bars whenever the lens is working: entrances and tight shots.
+      const wantBars = inIntro || run.cam.s > 1.1 ? 1 : 0
+      run.barsK = (run.barsK ?? 0) + (wantBars - (run.barsK ?? 0)) * Math.min(1, dt / 400)
+      if (run.barsK > 0.02) {
+        const bh = 26 * run.barsK
+        ctx.fillStyle = 'rgba(2,3,6,0.92)'
+        ctx.fillRect(0, 0, size, bh)
+        ctx.fillRect(0, H - bh, size, bh)
+      }
       if (!reduced) {
         ctx.fillStyle = 'rgba(0,0,0,0.15)'
         for (let yy = 0; yy < H; yy += 3) ctx.fillRect(0, yy, size, 1)

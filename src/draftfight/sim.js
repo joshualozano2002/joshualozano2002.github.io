@@ -59,59 +59,30 @@ const ramp = (t) => {
 export function simulate(seed, n) {
   const rng = makeRng(`${seed}:fight`)
 
-  // The rumble draw: who starts, and when everyone else's music hits.
-  const entryOrder = shuffle(rng, Array.from({ length: n }, (_, i) => i))
-  const entryTick = new Int32Array(n)
-  const entryX = new Float64Array(n)
-  const entries = [] // scheduled arrivals after the opening pair
-  {
-    let tAcc = 0
-    for (let k = 0; k < n; k++) {
-      const id = entryOrder[k]
-      if (k < 2) {
-        entryTick[id] = 0
-        entryX[id] = k === 0 ? 380 + rng() * 60 : 560 + rng() * 60
-      } else {
-        tAcc += Math.floor(TICK_HZ * (15 + rng() * 9))
-        entryTick[id] = tAcc
-        entryX[id] = 360 + rng() * 280
-        entries.push({ t: tAcc, id, num: k + 1 })
-      }
-    }
-  }
-  const lastEntryT = entries.length ? entries[entries.length - 1].t : 0
-  const MAX_TICKS = lastEntryT + TICK_HZ * 240
+  const MAX_TICKS = TICK_HZ * 300
 
   // The arsenal. Schedules, types, and placements come from a separate
   // stream, drawn entirely up front, so the main combat stream is never
   // disturbed. Every weapon is seeded — the same fight for every viewer.
   const WEAPONS = {
-    chair: { uses: 5, mult: 2.2 }, // the classic
-    kendo: { uses: 9, mult: 1.5 }, // fast and mean
+    chair: { uses: 7, mult: 2.2 }, // the classic
+    kendo: { uses: 12, mult: 1.5 }, // fast and mean
     can: { uses: 1, mult: 3.0 }, // one shot, and the target sees stars
   }
   const WKINDS = ['chair', 'kendo', 'can']
   const objRng = makeRng(`${seed}:objects`)
-  const chairPlan = [
-    {
-      at: Math.floor(TICK_HZ * (35 + objRng() * 22)),
-      w: WKINDS[Math.floor(objRng() * 3) % 3],
+  // A rolling armoury: a fresh weapon slides in a beat after the last one
+  // breaks, so there is nearly always something on the mat worth grabbing.
+  const chairPlan = []
+  for (let k = 0; k < 10; k++) {
+    chairPlan.push({
+      gap: Math.floor(TICK_HZ * (2 + objRng() * 3)),
+      w: ((r) => (r < 0.4 ? 'chair' : r < 0.8 ? 'kendo' : 'can'))(objRng()),
       ang: objRng(),
       rad: 95 + objRng() * 65,
-    },
-    {
-      at: Math.floor(TICK_HZ * (85 + objRng() * 28)),
-      w: WKINDS[Math.floor(objRng() * 3) % 3],
-      ang: objRng(),
-      rad: 95 + objRng() * 65,
-    },
-    {
-      at: Math.floor(TICK_HZ * (135 + objRng() * 30)),
-      w: WKINDS[Math.floor(objRng() * 3) % 3],
-      ang: objRng(),
-      rad: 95 + objRng() * 65,
-    },
-  ]
+    })
+  }
+  let nextSpawnAt = Math.floor(TICK_HZ * (6 + objRng() * 5))
   // The table: set up mid-ring, waiting for somebody to be put through it.
   const tablePlan = {
     happens: objRng() < 0.75,
@@ -131,6 +102,7 @@ export function simulate(seed, n) {
   let tableUp = false
   let tableDone = false
   const stunnedUntil = new Int32Array(n).fill(-1)
+  const showOffUntil = new Int32Array(n).fill(-1) // the he's-got-the-chair beat
 
   // Earned specials: deal enough damage and you take to the top rope; absorb
   // enough and the comeback kicks in. Thresholds, not dice — you earn them.
@@ -244,13 +216,14 @@ export function simulate(seed, n) {
     // Slide a chair in on schedule — near the action, so somebody trips over
     // it soon. Position comes from the live centroid plus a pre-drawn offset.
     if (
-      chairPlanIdx < chairPlan.length &&
-      t >= chairPlan[chairPlanIdx].at &&
+      nextSpawnAt >= 0 &&
+      t >= nextSpawnAt &&
       chairHolder < 0 &&
       !chairOnMat &&
-      alive > 3
+      alive > 2
     ) {
-      const plan = chairPlan[chairPlanIdx++]
+      nextSpawnAt = -1 // re-armed when this one breaks
+      const plan = chairPlan[chairPlanIdx++ % chairPlan.length]
       let mx = 0
       let my = 0
       let mc = 0
@@ -318,6 +291,7 @@ export function simulate(seed, n) {
           chairOnMat = false
           chairHolder = i
           chairSwings = WEAPONS[weaponKind].uses
+          showOffUntil[i] = t + 16
           objects.push({ k: 'pick', w: weaponKind, t, by: i })
           break
         }
@@ -461,8 +435,9 @@ export function simulate(seed, n) {
         continue
       }
 
-      // Seeing stars: a trash-can shot leaves you standing but helpless.
-      if (t < stunnedUntil[i]) {
+      // Seeing stars — or showing the crowd what you just picked up. Either
+      // way you're not swinging for a moment.
+      if (t < stunnedUntil[i] || t < showOffUntil[i]) {
         x[i] += ix[i]
         y[i] += iy[i]
         ix[i] *= 0.86
@@ -550,6 +525,7 @@ export function simulate(seed, n) {
             chairSwings--
             if (chairSwings <= 0) {
               chairHolder = -2
+              nextSpawnAt = t + chairPlan[chairPlanIdx % chairPlan.length].gap
               objects.push({ k: 'break', w: weaponKind, t, by: i, on: tg })
             }
           }
