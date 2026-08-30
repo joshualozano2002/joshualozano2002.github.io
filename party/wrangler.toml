@@ -9,3 +9,7 @@ class_name = "Room"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[kv_namespaces]]
+binding = "TTS"
+id = "4ba2b4967b90424c94dbc112e7416b10"

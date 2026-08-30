@@ -13,9 +13,98 @@
 const ALLOWED_EMOJI = new Set(['🔥', '👏', '😂', '💀', '🍿', '🪑'])
 const THROWABLES = new Set(['tomato', 'can', 'rose', 'money'])
 
+// ---- Announcer TTS -------------------------------------------------------
+// The fight's whole script is known in advance (deterministic sim), so the
+// site posts every line once; we synthesize through ElevenLabs, cache the
+// audio in KV forever, and the entire league replays from cache. If the
+// ELEVEN_KEY secret is missing or the quota is gone, the site quietly falls
+// back to the browser voice — the fight is never blocked on audio.
+
+const TTS_MODEL = 'eleven_flash_v2_5'
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+}
+
+async function lineId(voice, text) {
+  const data = new TextEncoder().encode(`${voice}|${TTS_MODEL}|${text}`)
+  const hash = await crypto.subtle.digest('SHA-256', data)
+  return [...new Uint8Array(hash)].slice(0, 12).map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function handleTts(request, env, url) {
+  if (request.method === 'OPTIONS') return new Response(null, { headers: CORS })
+  const voice = env.VOICE_ID ?? 'pNInz6obpgDQGcFmaJgB' // "Adam" — deep, broadcast-ready
+
+  if (url.pathname === '/tts/health') {
+    return Response.json({ ok: Boolean(env.ELEVEN_KEY) }, { headers: CORS })
+  }
+
+  const audio = url.pathname.match(/^\/tts\/audio\/([0-9a-f]{24})$/)
+  if (audio) {
+    const buf = await env.TTS.get(audio[1], 'arrayBuffer')
+    if (!buf) return new Response('not found', { status: 404, headers: CORS })
+    return new Response(buf, {
+      headers: {
+        ...CORS,
+        'Content-Type': 'audio/mpeg',
+        'Cache-Control': 'public, max-age=31536000, immutable',
+      },
+    })
+  }
+
+  if (url.pathname === '/tts' && request.method === 'POST') {
+    if (!env.ELEVEN_KEY) return Response.json({ ok: false }, { status: 503, headers: CORS })
+    let body
+    try {
+      body = await request.json()
+    } catch {
+      return new Response('bad request', { status: 400, headers: CORS })
+    }
+    const lines = (body.lines ?? [])
+      .filter((l) => typeof l === 'string' && l.length > 0 && l.length <= 220)
+      .slice(0, 80)
+    const out = {}
+    for (const text of lines) {
+      const id = await lineId(voice, text)
+      const hit = await env.TTS.get(id, 'stream')
+      if (hit) {
+        out[text] = id
+        continue
+      }
+      try {
+        const res = await fetch(
+          `https://api.elevenlabs.io/v1/text-to-speech/${voice}?output_format=mp3_22050_32`,
+          {
+            method: 'POST',
+            headers: { 'xi-api-key': env.ELEVEN_KEY, 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text,
+              model_id: TTS_MODEL,
+              voice_settings: { stability: 0.35, similarity_boost: 0.7, style: 0.55 },
+            }),
+          },
+        )
+        if (!res.ok) continue // quota or transient failure: skip this line
+        const buf = await res.arrayBuffer()
+        if (buf.byteLength < 500) continue
+        await env.TTS.put(id, buf)
+        out[text] = id
+      } catch {
+        // network hiccup: the line just won't be spoken
+      }
+    }
+    return Response.json({ ok: true, clips: out }, { headers: CORS })
+  }
+  return new Response('draft fight tts', { status: 404, headers: CORS })
+}
+
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
+    if (url.pathname.startsWith('/tts')) return handleTts(request, env, url)
     const m = url.pathname.match(/^\/room\/([a-zA-Z0-9-]{4,40})$/)
     if (!m) return new Response('draft fight party worker', { status: 200 })
     const id = env.ROOMS.idFromName(m[1])

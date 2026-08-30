@@ -16,6 +16,7 @@ const PREFERRED = [
   'Daniel', // macOS/iOS UK — the closest thing to a broadcast voice
   'Reed',
   'Aaron',
+  'Evan',
   'Samantha',
   'Google UK English Male',
   'Google US English',
@@ -24,11 +25,20 @@ const PREFERRED = [
 function pickVoice() {
   const voices = window.speechSynthesis.getVoices()
   if (!voices.length) return null
-  for (const p of PREFERRED) {
-    const v = voices.find((v) => v.name === p || v.name.startsWith(`${p} `))
-    if (v) return v
+  const en = voices.filter((v) => v.lang && v.lang.startsWith('en'))
+  const pool = en.length ? en : voices
+  // The compact system voices are robotic; the downloadable Enhanced/Premium
+  // ones are dramatically better. If the device has one, always use it —
+  // ideally one from the preferred list, otherwise any of them.
+  const rich = pool.filter((v) => /enhanced|premium|natural/i.test(v.name))
+  for (const set of [rich, pool]) {
+    for (const p of PREFERRED) {
+      const v = set.find((v) => v.name === p || v.name.startsWith(`${p} `))
+      if (v) return v
+    }
+    if (set === rich && rich.length) return rich[0]
   }
-  return voices.find((v) => v.lang && v.lang.startsWith('en')) ?? voices[0]
+  return pool[0]
 }
 
 /**
@@ -45,8 +55,10 @@ export function speakLine(text) {
   const u = new SpeechSynthesisUtterance(text)
   const v = pickVoice()
   if (v) u.voice = v
-  u.rate = 1.12
-  u.pitch = 1.0
+  // Excited calls get an excited read; colour lines stay conversational.
+  const hype = /!$/.test(text.trim())
+  u.rate = hype ? 1.18 : 1.08
+  u.pitch = hype ? 1.06 : 0.98
   u.volume = 1
   live++
   u.onend = () => {

@@ -11,6 +11,13 @@ import { newSeed } from '../draftfight/rng'
 import { sharedNow, syncClock } from '../draftfight/clock'
 import { PARTY_EMOJI, PARTY_THROWS, useParty } from '../draftfight/useParty'
 import { quietVoice, speakLine, voiceSupported } from '../draftfight/voice'
+import {
+  announcerConfigured,
+  prepareAnnouncer,
+  quietAnnouncer,
+  sayClip,
+} from '../draftfight/announcer'
+import { buildLines } from '../draftfight/commentary'
 import { primeAudio } from '../draftfight/sound'
 
 const SIZES = Array.from({ length: MAX_MANAGERS - MIN_MANAGERS + 1 }, (_, i) => MIN_MANAGERS + i)
@@ -440,13 +447,28 @@ export default function DraftFight() {
 
   const onTicker = useCallback((text) => {
     setFeed((f) => [{ id: feedId.current++, text }, ...f].slice(0, 3))
-    if (voiceRef.current) speakLine(text)
+    if (!voiceRef.current) return
+    // Real announcer when the clip exists; the device voice covers the rest.
+    if (!sayClip(text)) speakLine(text)
   }, [])
 
   const toggleVoice = () => {
     setVoice((v) => {
-      if (v) quietVoice()
-      else speakLine('The announcer is live.')
+      if (v) {
+        quietVoice()
+        quietAnnouncer()
+      } else {
+        // Warm the real announcer: post the fight's whole script once. The
+        // worker caches every clip, so the league shares one generation.
+        if (announcerConfigured() && fight && fighters) {
+          prepareAnnouncer(buildLines({ fight, fighters, n: fighters.length })).then((ok) => {
+            if (ok) sayClip('The announcer is live.')
+            else speakLine('The announcer is live.')
+          })
+        } else {
+          speakLine('The announcer is live.')
+        }
+      }
       return !v
     })
   }
@@ -776,7 +798,7 @@ export default function DraftFight() {
                     >
                       SOUND {sound ? 'ON' : 'OFF'}
                     </button>
-                    {voiceSupported() ? (
+                    {voiceSupported() || announcerConfigured() ? (
                       <button
                         type="button"
                         onClick={toggleVoice}
@@ -834,7 +856,7 @@ export default function DraftFight() {
                           >
                             {sound ? 'SOUND ON' : 'SOUND OFF'}
                           </button>
-                          {voiceSupported() ? (
+                          {voiceSupported() || announcerConfigured() ? (
                             <button
                               type="button"
                               onClick={toggleVoice}
@@ -876,6 +898,15 @@ export default function DraftFight() {
                           >
                             {sound ? 'SOUND ON' : 'SOUND OFF'}
                           </button>
+                          {voiceSupported() || announcerConfigured() ? (
+                            <button
+                              type="button"
+                              onClick={toggleVoice}
+                              className="readout rounded-xs border border-hairline px-3 py-1.5 text-[10px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
+                            >
+                              {voice ? 'VOICE ON' : 'VOICE OFF'}
+                            </button>
+                          ) : null}
                           {hud.secs < -2 ? (
                             <button
                               type="button"
