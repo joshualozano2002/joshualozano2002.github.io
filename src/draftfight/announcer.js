@@ -29,15 +29,20 @@ export async function prepareAnnouncer(lines) {
   try {
     const health = await fetch(`${base}/tts/health`).then((r) => r.json())
     if (!health.ok) return false
-    const res = await fetch(`${base}/tts`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ lines }),
-    })
-    if (!res.ok) return false
-    const data = await res.json()
-    clips = { ...clips, ...data.clips }
-    ready = Object.keys(clips).length > 0
+    // Small batches: each line costs the worker up to three subrequests
+    // (cache check, synthesis, store), and the free tier allows 50 per
+    // request. Twelve lines a call stays comfortably inside.
+    for (let i = 0; i < lines.length; i += 12) {
+      const res = await fetch(`${base}/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lines: lines.slice(i, i + 12) }),
+      })
+      if (!res.ok) continue
+      const data = await res.json()
+      clips = { ...clips, ...data.clips }
+      ready = Object.keys(clips).length > 0
+    }
     return ready
   } catch {
     return false
