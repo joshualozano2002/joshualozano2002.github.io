@@ -973,11 +973,18 @@ export default function DraftFight() {
                           >
                             {spec.startAt ? 'WATCH THE REPLAY' : 'WATCH AGAIN'}
                           </button>
+                          <button
+                            type="button"
+                            onClick={() => publish({ ...spec, seed: newSeed(), startAt: 0 })}
+                            className="readout rounded-xs border border-amber/60 px-3 py-2 text-[11px] tracking-[0.16em] text-amber hover:bg-amber/10"
+                          >
+                            NEW FIGHT · NEW LINK
+                          </button>
                         </div>
                         <p className="mt-5 text-xs text-mute">
                           {spec.startAt
                             ? `This one aired live ${bellText(spec.startAt)} — the whole league saw the same ${n - 1} knockouts at the same moment, and the link replays it for anyone who missed the broadcast.`
-                            : `This link always replays this fight. Anyone who thinks you fixed it can open it themselves and watch the same ${n - 1} knockouts land in the same order.`}
+                            : `Same link, same fight, every time — that's the league's receipt, so nobody can claim the result changed. Want a different outcome? That's what NEW FIGHT is for: fresh dice, fresh link.`}
                         </p>
 
                         {myCall !== null && fighters[myCall] ? (
