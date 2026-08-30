@@ -116,6 +116,8 @@ export function simulate(seed, n) {
   const diveSY = new Float64Array(n)
   const diveCount = new Uint8Array(n)
   const raged = new Uint8Array(n)
+  let lastDiveT = -9999
+  let divesLeft = Math.ceil(n * 0.55) // high spots stay special
   const rageUntil = new Int32Array(n).fill(-1)
   const CORNERS_IN = [
     [LO + 6, LO + 6],
@@ -411,8 +413,10 @@ export function simulate(seed, n) {
       // Earn the top rope: enough damage dealt, no weapon in hand, field open.
       if (
         mode[i] === 0 &&
+        divesLeft > 0 &&
         diveCount[i] < 1 &&
-        dealtSince[i] >= 95 &&
+        dealtSince[i] >= 42 &&
+        t - lastDiveT > TICK_HZ * 9 &&
         chairHolder !== i &&
         alive > 2
       ) {
@@ -429,6 +433,8 @@ export function simulate(seed, n) {
         }
         mode[i] = 1
         modeT[i] = 0
+        lastDiveT = t
+        divesLeft--
         diveCount[i]++
         diveTX[i] = CORNERS_IN[ci][0]
         diveTY[i] = CORNERS_IN[ci][1]
@@ -516,7 +522,9 @@ export function simulate(seed, n) {
           }
           sDmg[i] += dmg
           sTaken[tg] += dmg
-          dealtSince[i] += dmg
+          // The top-rope meter counts effort thrown, not crowd-damped output —
+          // otherwise nobody earns the high spot until the fight is old.
+          dealtSince[i] += roll * power[i]
           takenSince[tg] += dmg
           sHits[i]++
           if (chair) {
