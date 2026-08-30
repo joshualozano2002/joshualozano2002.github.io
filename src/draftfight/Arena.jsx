@@ -171,6 +171,8 @@ export default function Arena({
       flash: 0, // white impact frame until (ms)
       pyro: [], // celebration + debris particles
       showOffs: new Array(n).fill(0), // he's-got-the-weapon beat until (ms)
+      takeover: null, // {i, until, label, color} — lights out, one spotlight
+      prevSt: new Array(n).fill(2), // to catch the instant someone launches
       stars: new Array(n).fill(0), // seeing-stars until (ms clock)
       rageGlow: new Array(n).fill(0),
       belled: false,
@@ -342,7 +344,13 @@ export default function Arena({
                 at(px, Math.min(o.t, ticks - 1), o.by),
                 at(py, Math.min(o.t, ticks - 1), o.by),
               )
-              run.camPunch = { x: PX, y: PY, s: 1.18, until: now + 750 }
+              run.camPunch = { x: PX, y: PY, s: 1.3, until: now + 900 }
+              run.takeover = {
+                i: o.by,
+                until: now + 950,
+                label: `${fighters[o.by].short} HAS THE ${WLABEL[o.w]}`,
+                color: fighters[o.by].color,
+              }
             }
           } else if (o.k === 'break') {
             ch.mode = 'none'
@@ -464,6 +472,25 @@ export default function Arena({
 
       let aliveNow = 0
       for (let i = 0; i < n; i++) if (at(state, t0, i) === 2) aliveNow++
+
+      // The instant somebody leaves the top rope, the building goes dark for
+      // them alone.
+      if (run.elapsed >= 0 && !inReplay) {
+        for (let i = 0; i < n; i++) {
+          const st = at(state, t0, i)
+          if (st === 5 && run.prevSt[i] !== 5) {
+            const [PX, PY] = proj(at(px, t0, i), at(py, t0, i))
+            run.camPunch = { x: PX, y: PY, s: 1.32, until: now + 900 }
+            run.takeover = {
+              i,
+              until: now + 900,
+              label: `${fighters[i].short} GOES UP TOP!`,
+              color: fighters[i].color,
+            }
+          }
+          run.prevSt[i] = st
+        }
+      }
       // During the epilogue the HUD keeps reporting the settled fight.
       const aliveHud = run.elapsed > durMs && !inReplay ? (n > 1 ? 1 : n) : aliveNow
 
@@ -1162,6 +1189,46 @@ export default function Arena({
         }
         ctx.restore()
         ctx.globalAlpha = 1
+      }
+
+      // SPOTLIGHT TAKEOVER: the arena disappears; one fighter owns the frame.
+      if (run.takeover && now < run.takeover.until && run.elapsed >= 0 && !inReplay) {
+        const tk = run.takeover
+        const age = 1 - (tk.until - now) / 950
+        const k = Math.min(1, age * 5) * Math.min(1, (1 - age) * 4)
+        const st = at(state, t0, tk.i)
+        if (st === 2 || st === 4 || st === 5) {
+          const wx = at(px, t0, tk.i) * (1 - a) + at(px, t1, tk.i) * a
+          const wy = at(py, t0, tk.i) * (1 - a) + at(py, t1, tk.i) * a
+          const [X, Y, d] = proj(wx, wy)
+          ctx.fillStyle = `rgba(1,2,5,${0.72 * k})`
+          ctx.fillRect(-120, -120, 1240, VIEW_H + 240)
+          // The one beam in the building.
+          ctx.beginPath()
+          ctx.moveTo(X - 30, -30)
+          ctx.lineTo(X + 30, -30)
+          ctx.lineTo(X + 78 * d, Y + 26 * d)
+          ctx.lineTo(X - 78 * d, Y + 26 * d)
+          ctx.closePath()
+          ctx.fillStyle = `rgba(255,232,180,${0.22 * k})`
+          ctx.fill()
+          ctx.beginPath()
+          ctx.ellipse(X, Y + 22 * d, 66 * d, 20 * d, 0, 0, TAU)
+          ctx.fillStyle = `rgba(255,232,180,${0.16 * k})`
+          ctx.fill()
+          drawOne({ i: tk.i, st, wx, wy })
+          if (run.chair.mode === 'held' && run.chair.by === tk.i && run.showOffs[tk.i] > now) {
+            ctx.save()
+            ctx.translate(X, Y - 72 * d)
+            ctx.beginPath()
+            ctx.arc(0, 0, (16 + ((now / 70) % 10)) * d, 0, TAU)
+            ctx.strokeStyle = `rgba(255,216,138,${0.5 - ((now / 70) % 10) * 0.04})`
+            ctx.lineWidth = 2
+            ctx.stroke()
+            drawWeapon(ctx, run.chair.kind, 3.2 * d)
+            ctx.restore()
+          }
+        }
       }
 
       // Pyro and debris.
