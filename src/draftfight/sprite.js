@@ -38,6 +38,29 @@ export function drawChair(ctx, u = 3, held = false) {
   ctx.restore()
 }
 
+/** Things the crowd throws at the ring. Cosmetic, chunky, unmistakable. */
+export function drawThrowable(ctx, kind, u = 3) {
+  ctx.save()
+  const r = (x, y, w, h, c) => {
+    ctx.fillStyle = c
+    ctx.fillRect(x * u, y * u, w * u, h * u)
+  }
+  if (kind === 'tomato') {
+    r(-2, -2, 4, 4, '#e04836')
+    r(-1.2, -2.8, 2.4, 1, '#3f8f3f')
+  } else if (kind === 'can') {
+    r(-1.4, -3, 2.8, 6, '#aeb9c6')
+    r(-1.4, -1, 2.8, 2, '#4fd6ea')
+  } else if (kind === 'rose') {
+    r(-1.5, -3, 3, 2.4, '#e0365e')
+    r(-0.4, -0.6, 0.8, 3.6, '#3f8f3f')
+  } else if (kind === 'money') {
+    r(-3, -1.8, 6, 3.6, '#48b06a')
+    r(-1, -1, 2, 2, '#d9f2e2')
+  }
+  ctx.restore()
+}
+
 /** The referee — stripes, and one job: raise the winner's arm. */
 export function drawRef(ctx, pose = 'walk', frame = 0, facing = 1, u = 3) {
   ctx.save()

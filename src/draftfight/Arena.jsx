@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { RING_MAX, RING_MIN, TICK_HZ } from './sim.js'
-import { drawChair, drawRef, drawShadow, drawWrestler } from './sprite.js'
+import { drawChair, drawRef, drawShadow, drawThrowable, drawWrestler } from './sprite.js'
 import { sfxBell, sfxChair, sfxChant, sfxElim, sfxEntrance, sfxHit, sfxSpecial, sfxWin } from './sound.js'
 
 /**
@@ -67,6 +67,7 @@ export default function Arena({
   sound = false,
   runKey = 0,
   clock, // live broadcast: () => ms since the bell; overrides playing/speed
+  throwFeedRef, // crowd throwables from the watch party, cosmetic only
   league = '',
   champ = -1, // roster index defending Pick 1, -1 for nobody
   ctlRef, // page-facing controls: { skipIntro }
@@ -155,6 +156,8 @@ export default function Arena({
       milestones: new Set(),
       introIdx: -2, // which pre-show entrance is on, -2 before any
       save: 0, // pointer into the hang-on feed
+      thrown: [], // crowd objects in flight
+      splats: [], // what they leave on the mat
       feudSaid: false,
       streak: new Array(n).fill(0), // consecutive hits landed without taking one
       onFire: new Array(n).fill(false),
@@ -902,6 +905,61 @@ export default function Arena({
           ctx.fill()
           drawOne(fgt)
         }
+      }
+
+      // The crowd lets fly: drain the watch-party feed into arcs at the ring.
+      if (throwFeedRef?.current?.length) {
+        for (const kind of throwFeedRef.current.splice(0, 6)) {
+          run.thrown.push({
+            kind,
+            x0: 60 + Math.random() * 880,
+            y0: 30,
+            tx: 260 + Math.random() * 480,
+            ty: 300 + Math.random() * 380,
+            p: 0,
+            spin: (Math.random() - 0.5) * 10,
+          })
+        }
+      }
+      for (let i = run.thrown.length - 1; i >= 0; i--) {
+        const th = run.thrown[i]
+        th.p += dt / 950
+        if (th.p >= 1) {
+          run.splats.push({ kind: th.kind, x: th.tx, y: th.ty, life: 0 })
+          run.thrown.splice(i, 1)
+          continue
+        }
+        const wx = th.x0 + (th.tx - th.x0) * th.p
+        const wy = th.y0 + (th.ty - th.y0) * th.p
+        const [X, Y, d] = proj(wx, wy)
+        const z = Math.sin(th.p * Math.PI) * 150
+        ctx.save()
+        ctx.translate(X, Y - z * d)
+        ctx.rotate(th.p * th.spin)
+        drawThrowable(ctx, th.kind, 3.2 * d)
+        ctx.restore()
+      }
+      for (let i = run.splats.length - 1; i >= 0; i--) {
+        const sp = run.splats[i]
+        sp.life += dt / 5000
+        if (sp.life >= 1) {
+          run.splats.splice(i, 1)
+          continue
+        }
+        const [X, Y, d] = proj(sp.x, sp.y)
+        ctx.save()
+        ctx.globalAlpha = Math.min(1, (1 - sp.life) * 1.6)
+        if (sp.kind === 'tomato') {
+          ctx.beginPath()
+          ctx.ellipse(X, Y, 13 * d, 6 * d, 0, 0, TAU)
+          ctx.fillStyle = '#b23a2c'
+          ctx.fill()
+        } else {
+          ctx.translate(X, Y)
+          drawThrowable(ctx, sp.kind, 3 * d)
+        }
+        ctx.restore()
+        ctx.globalAlpha = 1
       }
 
       // ---- FX ----

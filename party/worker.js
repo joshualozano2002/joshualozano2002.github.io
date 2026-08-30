@@ -11,6 +11,7 @@
  */
 
 const ALLOWED_EMOJI = new Set(['🔥', '👏', '😂', '💀', '🍿', '🪑'])
+const THROWABLES = new Set(['tomato', 'can', 'rose', 'money'])
 
 export default {
   async fetch(request, env) {
@@ -50,6 +51,14 @@ export class Room {
       }
       if (msg.t === 'react' && ALLOWED_EMOJI.has(msg.e)) {
         this.send({ t: 'react', e: msg.e })
+      } else if (msg.t === 'throw' && THROWABLES.has(msg.k)) {
+        // The crowd throws things at the ring. Cosmetic for every viewer —
+        // never touches the fight — and rate-limited so nobody floods it.
+        const now = Date.now()
+        if (now - (session.lastThrow ?? 0) >= 700) {
+          session.lastThrow = now
+          this.send({ t: 'throw', k: msg.k })
+        }
       } else if (msg.t === 'call' && Number.isInteger(msg.who) && msg.who >= -1 && msg.who < 16) {
         if (msg.who === -1) this.calls.delete(session.id)
         else this.calls.set(session.id, msg.who)

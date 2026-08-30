@@ -9,7 +9,8 @@ import { buildFighters } from '../draftfight/roster'
 import { simulate } from '../draftfight/sim'
 import { newSeed } from '../draftfight/rng'
 import { sharedNow, syncClock } from '../draftfight/clock'
-import { PARTY_EMOJI, useParty } from '../draftfight/useParty'
+import { PARTY_EMOJI, PARTY_THROWS, useParty } from '../draftfight/useParty'
+import { quietVoice, speakLine, voiceSupported } from '../draftfight/voice'
 import { primeAudio } from '../draftfight/sound'
 
 const SIZES = Array.from({ length: MAX_MANAGERS - MIN_MANAGERS + 1 }, (_, i) => MIN_MANAGERS + i)
@@ -347,6 +348,9 @@ export default function DraftFight() {
   const [hud, setHud] = useState({ secs: 0, alive: 0 })
   const [speed, setSpeed] = useState(1)
   const [sound, setSound] = useState(false)
+  const [voice, setVoice] = useState(false)
+  const voiceRef = useRef(false)
+  voiceRef.current = voice
   const [playing, setPlaying] = useState(false)
   const [runKey, setRunKey] = useState(0)
   const [href, setHref] = useState('')
@@ -436,7 +440,16 @@ export default function DraftFight() {
 
   const onTicker = useCallback((text) => {
     setFeed((f) => [{ id: feedId.current++, text }, ...f].slice(0, 3))
+    if (voiceRef.current) speakLine(text)
   }, [])
+
+  const toggleVoice = () => {
+    setVoice((v) => {
+      if (v) quietVoice()
+      else speakLine('The announcer is live.')
+      return !v
+    })
+  }
 
   // Call your shot: this viewer's private prediction, kept on this device only.
   const callKey = spec ? `df-call-${spec.seed}` : null
@@ -763,6 +776,15 @@ export default function DraftFight() {
                     >
                       SOUND {sound ? 'ON' : 'OFF'}
                     </button>
+                    {voiceSupported() ? (
+                      <button
+                        type="button"
+                        onClick={toggleVoice}
+                        className="readout rounded-xs border border-hairline px-4 py-3 text-[11px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
+                      >
+                        VOICE {voice ? 'ON' : 'OFF'}
+                      </button>
+                    ) : null}
                     <button
                       type="button"
                       onClick={() => publish({ ...spec, seed: newSeed() })}
@@ -812,6 +834,15 @@ export default function DraftFight() {
                           >
                             {sound ? 'SOUND ON' : 'SOUND OFF'}
                           </button>
+                          {voiceSupported() ? (
+                            <button
+                              type="button"
+                              onClick={toggleVoice}
+                              className="readout rounded-xs border border-hairline px-3 py-1.5 text-[10px] tracking-[0.16em] text-dim hover:border-amber hover:text-amber"
+                            >
+                              {voice ? 'VOICE ON' : 'VOICE OFF'}
+                            </button>
+                          ) : null}
                         </div>
                       ) : null}
                       {phase === 'live' && !isLive ? (
@@ -893,6 +924,7 @@ export default function DraftFight() {
                         sound={sound}
                         runKey={runKey}
                         clock={isLive ? liveClock : undefined}
+                        throwFeedRef={party.throwFeedRef}
                         league={spec.league}
                         champ={spec.champ ?? -1}
                         ctlRef={arenaCtl}
@@ -902,7 +934,7 @@ export default function DraftFight() {
                         onEnd={onEnd}
                       />
                         {party.enabled ? (
-                          <div className="mt-2 flex justify-center gap-1.5">
+                          <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5">
                             {PARTY_EMOJI.map((e) => (
                               <button
                                 key={e}
@@ -912,6 +944,21 @@ export default function DraftFight() {
                                 aria-label={`React ${e}`}
                               >
                                 {e}
+                              </button>
+                            ))}
+                            <span className="readout mx-2 text-[9px] tracking-[0.18em] text-mute">
+                              THROW
+                            </span>
+                            {PARTY_THROWS.map((th) => (
+                              <button
+                                key={th.k}
+                                type="button"
+                                onClick={() => party.sendThrow(th.k)}
+                                className="rounded-xs border border-hairline-hot px-2.5 py-1 text-base transition-colors hover:border-amber"
+                                aria-label={`Throw ${th.k} at the ring`}
+                                title={`Throw a ${th.k} at the ring — everyone sees it`}
+                              >
+                                {th.icon}
                               </button>
                             ))}
                           </div>

@@ -7,6 +7,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { PARTY_URL } from './party-config.js'
 
 export const PARTY_EMOJI = ['🔥', '👏', '😂', '💀', '🍿', '🪑']
+export const PARTY_THROWS = [
+  { k: 'tomato', icon: '🍅' },
+  { k: 'can', icon: '🥤' },
+  { k: 'rose', icon: '🌹' },
+  { k: 'money', icon: '💵' },
+]
 
 export function useParty(roomKey) {
   const [watching, setWatching] = useState(0)
@@ -14,6 +20,7 @@ export function useParty(roomKey) {
   const [reactions, setReactions] = useState([]) // floating emoji, newest last
   const wsRef = useRef(null)
   const reactId = useRef(0)
+  const throwFeedRef = useRef([]) // drained by the arena, one canvas throw each
 
   useEffect(() => {
     if (!PARTY_URL || !roomKey) return undefined
@@ -38,6 +45,9 @@ export function useParty(roomKey) {
         if (msg.t === 'state') {
           setWatching(msg.watching ?? 0)
           setTally(msg.tally ?? {})
+        } else if (msg.t === 'throw') {
+          throwFeedRef.current.push(msg.k)
+          if (throwFeedRef.current.length > 40) throwFeedRef.current.shift()
         } else if (msg.t === 'react') {
           const id = reactId.current++
           setReactions((r) => [...r.slice(-24), { id, e: msg.e, x: 8 + Math.random() * 84 }])
@@ -73,6 +83,14 @@ export function useParty(roomKey) {
     }
   }, [])
 
+  const sendThrow = useCallback((k) => {
+    try {
+      wsRef.current?.send(JSON.stringify({ t: 'throw', k }))
+    } catch {
+      /* offline */
+    }
+  }, [])
+
   const sendCall = useCallback((who) => {
     try {
       wsRef.current?.send(JSON.stringify({ t: 'call', who }))
@@ -81,5 +99,5 @@ export function useParty(roomKey) {
     }
   }, [])
 
-  return { enabled: Boolean(PARTY_URL), watching, tally, reactions, sendReact, sendCall }
+  return { enabled: Boolean(PARTY_URL), watching, tally, reactions, throwFeedRef, sendReact, sendThrow, sendCall }
 }
