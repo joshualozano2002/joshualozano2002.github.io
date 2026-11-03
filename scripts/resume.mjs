@@ -27,7 +27,7 @@ const CHROME =
   process.env.CHROME_PATH ?? '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 
 // Per-organisation bullet caps, keyed by org name.
-const BULLET_CAPS = { 'PA-AI': 4, 'Modern Faith Works': 3, NASA: 3 }
+const BULLET_CAPS = { Eydora: 4, 'Modern Faith Works': 3, NASA: 3 }
 
 // Projects worth print space, in order.
 const PROJECT_SLUGS = ['modern-faith-works', 'wildfire-classifier', 'bnf-interpreter']

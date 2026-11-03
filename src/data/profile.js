@@ -8,8 +8,9 @@ export const profile = {
   // Current position, surfaced in the hero and the dossier header.
   current: {
     title: 'Operations & Technical Program Coordinator',
-    org: 'PA-AI',
-    since: '2025',
+    org: 'Eydora',
+    url: 'https://www.eydora.ai',
+    since: '2026',
   },
   education: 'BS Computer Science, Sonoma State University',
 

@@ -60,7 +60,7 @@ export const personSchema = () => ({
   image: `${absUrl('/')}/${'media/flight-deck.webp'}`.replace(/([^:]\/)\/+/g, '$1'),
   email: `mailto:${profile.email}`,
   jobTitle: profile.current.title,
-  worksFor: { '@type': 'Organization', name: profile.current.org, url: 'https://pa-ai.ai' },
+  worksFor: { '@type': 'Organization', name: profile.current.org, url: profile.current.url },
   description: profile.tagline,
   alumniOf: {
     '@type': 'CollegeOrUniversity',

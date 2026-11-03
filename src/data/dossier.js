@@ -32,21 +32,23 @@ export const dossier = {
 
   experience: [
     {
-      org: 'PA-AI',
+      org: 'Eydora',
       place: 'Remote',
       role: 'Operations & Technical Program Coordinator',
       period: '2026 — Present',
       current: true,
+      url: 'https://www.eydora.ai',
       summary:
-        'Strategic intelligence platform built on the Psycho-Aesthetics® methodology, positioned as a human intelligence layer for AI.',
+        'A cognitive assistant that predicts product adoption, built on Ravi Sawhney\u2019s Psycho-Aesthetics\u00ae methodology across seven business disciplines. Rebranded from PA-AI in 2026.',
       bullets: [
         'Own release quality for the staging platform: run structured QA passes, file and track defects to resolution, verify engineering fix claims against spec, and publish written summaries to engineering and leadership.',
+        'Designed the Eydora marketing site end to end for the PA-AI rebrand \u2014 every page, layout and interaction my own \u2014 and moved it off Wix onto a fragment-based CMS.',
         'Authored a 19-requirement specification with working reference implementations to remediate slide-deck export defects, and ran 15 graded audit rounds on generator output quality across briefs, reports, and HTML decks.',
         'Led a 642-issue backlog remediation in Linear alongside the product lead — triage, status normalization, ownership labeling, and a three-contract reconciliation workbook.',
         'Built the customer support infrastructure end to end: 29 help articles, an AI support agent trained on internal product material, a redesigned Help Center, and the canonical product vocabulary the content is written against.',
         'Stood up billing in Stripe across 12 products spanning subscription plans, student tiers, and one-time report packages, and built the pricing models and margin analysis behind them.',
         'Prototype product surfaces in single-file HTML for design and stakeholder review, including an evaluator view with a scoring radar chart, benchmark library, and export flow.',
-        'Migrated the company website off Wix onto a fragment-based CMS, rebuilding the platform, case studies, media, and pricing pages; built out the CRM with a tag taxonomy and enrichment for 160+ contacts.',
+        'Built out the CRM with a tag taxonomy and contact enrichment for 160+ contacts.',
       ],
     },
     {
