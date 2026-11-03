@@ -52,19 +52,20 @@ export const dossier = {
     {
       org: 'Modern Faith Works',
       place: 'California',
-      role: 'Vice President',
+      role: 'Vice President & Full-Stack Engineer',
       period: '2026 \u2014 Present',
       current: true,
       url: 'https://modernfaithworks.org',
       summary:
-        'A registered 501(c)(3) non-profit documenting and preserving the history, art, and spirituality of Catholic churches around the world.',
+        'A registered 501(c)(3) non-profit documenting the history, art, and spirituality of Catholic churches, and shipping the app that does it.',
       bullets: [
-        'Serve on the board of the organization while acting as sole developer of its public platform, built continuously since June 2025.',
-        'Designed and built a bilingual application serving the web and Android from a single React Native codebase, backed by a Node and Express API on MongoDB with a Redis cache layer.',
-        'Built the interior walkthrough system \u2014 360\u00b0 and flat-photo nodes with tap-to-move navigation and catalogued artifacts pinned to photographs \u2014 and covered its geometry with an assertion suite that runs on every pull request.',
-        'Built the bilingual content pipeline: lectionary readings parsed server-side in both languages, a liturgical calendar merging an external API with a computed fallback, and generated narration in English and Spanish.',
-        'Engineered the whole system onto free tiers to fit an organization with no operating budget, holding total infrastructure to $7 per month, and automated backups, scraping, and reporting as scheduled CI jobs.',
-        'Built the admin platform behind it: content and narration editors, analytics dashboards, CSV import and export, TOTP two-factor authentication written from scratch, an audit log, and a session kill-switch.',
+        'Built and shipped a cross-platform Catholic church guide and prayer app: one React Native and Expo codebase serving iOS, Android, and web on a Node, Express, and MongoDB backend, bilingual with CI-enforced locale parity.',
+        'Designed an autonomous nightly release train that promotes staging to production only through green CI, then verifies its own deploys by commit hash, bundle rotation, and over-the-air runtime assertions.',
+        'Gated 1,200+ automated tests in GitHub Actions behind branch protection, with custom pull-request checks for accessibility, structured data, locale parity, and 3D tour geometry.',
+        'Built programmatic SEO at scale: build-time prerendering of 17,000+ church pages with JSON-LD, city hub pages, and readable no-JS content, cutting the nearest-neighbor linking pass from 118s to 3.9s with a grid index.',
+        'Shipped Stripe donations with idempotent webhook ingestion and an AI-assisted moderation queue for the public donor wall, alongside server-side moderation and report flows, per-admin accounts, and a durable audit log.',
+        'Instrumented Sentry across web and native with environment separation, release health, and sourcemap uploads, wired to an alert relay that posts to chat and auto-files tickets.',
+        'Serve on the board of the organization while acting as its engineer, on a two-person team running in production since June 2025.',
       ],
     },
     {
@@ -85,14 +86,20 @@ export const dossier = {
   ],
 
   skills: [
-    { group: 'Languages', items: ['C', 'C++', 'Python', 'SQL', 'x86 Assembly', 'ARM Assembly'] },
+    {
+      group: 'Languages',
+      items: ['Python', 'TypeScript', 'JavaScript', 'C', 'C++', 'SQL', 'x86 Assembly'],
+    },
     { group: 'Machine Learning', items: ['PyTorch', 'TensorFlow', 'Keras', 'scikit-learn', 'YOLOv8', 'OpenCV'] },
     { group: 'Data', items: ['Pandas', 'NumPy', 'Matplotlib', 'Jupyter', 'QGIS'] },
     {
       group: 'Web & Mobile',
       items: ['React', 'React Native', 'Expo', 'Node.js', 'Express', 'MongoDB', 'Redis'],
     },
-    { group: 'Systems & Tools', items: ['Unix', 'Git', 'Threads', 'CLion', 'Unreal Engine', 'Curses'] },
+    {
+      group: 'Systems & Tools',
+      items: ['Unix', 'Git', 'GitHub Actions', 'CI/CD', 'Sentry', 'Unreal Engine'],
+    },
     {
       group: 'Product Operations',
       items: ['Linear', 'Intercom', 'Stripe', 'PostHog', 'Freshsales', 'Vercel'],
