@@ -15,7 +15,7 @@ export default function Home() {
     <>
       <Seo
         title={`${profile.name} — Backend, Machine Learning & Technical Operations`}
-        description={`${profile.name} — ${profile.current.title} at ${profile.current.org} and Founder of Modern Faith Works, where he built a bilingual React Native church guide for iOS, Android, and the web. Former NASA SARP research intern. Backend, machine learning, and systems work.`}
+        description={`${profile.name} — ${profile.current.title} at ${profile.current.org} and Founder of Modern Faith Works, where he single-handedly built a bilingual React Native church guide for iOS, Android, and the web. Former NASA SARP research intern. Backend, machine learning, and systems work.`}
         path="/"
         jsonLd={personSchema()}
       />

@@ -22,7 +22,7 @@ export const missions = [
     brief: [
       'Almost nothing inside a Catholic church is documented for the person standing in it. Parish websites go stale \u2014 mass times worst of all \u2014 and there is no visitor-facing layer at all for the altar, statues, windows and relics that make these buildings historically significant. You can walk into a two-hundred-year-old mission and have no way to learn what you are looking at.',
       'The app answers that by modelling each church interior as a set of catalogued features pinned onto photographs. Tap a dot and you get the written history and studio-voice narration, in English or Spanish. Around that directory sits a practice layer sharing the same backend: daily Mass readings pulled from the official US lectionary, a guided rosary player, a community prayer wall, and a liturgical calendar. Two audiences, one system \u2014 visitors who want to understand a building, and practising Catholics who want daily tools in their own language.',
-      'Two constraints shaped everything else. The first is economic: this serves a non-profit with essentially no operating budget, so the system is engineered onto free tiers wherever it can be \u2014 open map tiles instead of a paid maps API, free-tier speech synthesis, free CI minutes for every scheduled job. The second is headcount. A two-person team runs this in production, which meant the release path had to run itself: a nightly release train promotes staging only through green CI, then verifies its own deploys and publishes the record. Several architecture decisions only make sense read through those two lenses.',
+      'Two constraints shaped everything else. The first is economic: this serves a non-profit with essentially no operating budget, so the system is engineered onto free tiers wherever it can be \u2014 open map tiles instead of a paid maps API, free-tier speech synthesis, free CI minutes for every scheduled job. The second is headcount. One engineer builds and runs this in production, which meant the release path had to run itself: a nightly release train promotes staging only through green CI, then verifies its own deploys and publishes the record. Several architecture decisions only make sense read through those two lenses.',
     ],
     stack: [
       'React Native',
@@ -69,7 +69,7 @@ export const missions = [
     ],
     links: [{ label: 'Visit the live site', href: 'https://modernfaithworks.org', external: true }],
     note:
-      'Built and run by a two-person team, in production since June 2025. Repositories are private \u2014 early history contains credentials.',
+      'Built and run by its sole engineer, in production since June 2025. Repositories are private \u2014 early history contains credentials.',
   },
   {
     slug: 'wildfire-classifier',

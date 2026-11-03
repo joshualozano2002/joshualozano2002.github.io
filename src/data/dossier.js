@@ -65,7 +65,7 @@ export const dossier = {
         'Built programmatic SEO at scale: build-time prerendering of 17,000+ church pages with JSON-LD, city hub pages, and readable no-JS content, cutting the nearest-neighbor linking pass from 118s to 3.9s with a grid index.',
         'Shipped Stripe donations with idempotent webhook ingestion and an AI-assisted moderation queue for the public donor wall, alongside server-side moderation and report flows, per-admin accounts, and a durable audit log.',
         'Instrumented Sentry across web and native with environment separation, release health, and sourcemap uploads, wired to an alert relay that posts to chat and auto-files tickets.',
-        'Founded the organization and serve as its Vice President while acting as its engineer, on a two-person team running in production since June 2025.',
+        'Founded the organization, serve as its Vice President, and am its sole engineer \u2014 every line of the platform, in production since June 2025.',
       ],
     },
     {
