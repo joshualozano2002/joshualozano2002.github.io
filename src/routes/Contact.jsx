@@ -1,12 +1,12 @@
 import Seo from '../components/Seo'
 import { Label, Lamp, Reveal } from '../components/ui'
-import { profile } from '../data/profile'
+import { handleOf, profile } from '../data/profile'
 import { withBase } from '../site'
 
 const channels = [
   { label: 'Email', value: 'joshualozano2002@gmail.com', href: `mailto:${profile.email}`, code: 'PRI' },
-  { label: 'GitHub', value: 'joshualozano2002', href: profile.github, code: 'SEC', ext: true },
-  { label: 'LinkedIn', value: 'joshua-lozano7', href: profile.linkedin, code: 'SEC', ext: true },
+  { label: 'GitHub', value: handleOf(profile.github), href: profile.github, code: 'SEC', ext: true },
+  { label: 'LinkedIn', value: handleOf(profile.linkedin), href: profile.linkedin, code: 'SEC', ext: true },
   {
     label: 'Modern Faith Works',
     value: 'modernfaithworks.org · Vice President',

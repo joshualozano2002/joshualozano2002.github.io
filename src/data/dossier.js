@@ -57,7 +57,7 @@ export const dossier = {
       current: true,
       url: 'https://modernfaithworks.org',
       summary:
-        'A registered 501(c)(3) non-profit documenting and preserving the history, art, and spirituality of California\u2019s Catholic churches.',
+        'A registered 501(c)(3) non-profit documenting and preserving the history, art, and spirituality of Catholic churches around the world.',
       bullets: [
         'Serve on the board of the organization while acting as sole developer of its public platform, built continuously since June 2025.',
         'Designed and built a bilingual application serving the web and Android from a single React Native codebase, backed by a Node and Express API on MongoDB with a Redis cache layer.',

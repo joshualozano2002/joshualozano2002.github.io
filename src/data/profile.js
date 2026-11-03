@@ -13,7 +13,7 @@ export const profile = {
   },
   education: 'BS Computer Science, Sonoma State University',
 
-  // Board role at a California non-profit.
+  // Board role at a 501(c)(3) non-profit.
   affiliation: {
     role: 'Vice President',
     org: 'Modern Faith Works',
@@ -21,7 +21,7 @@ export const profile = {
   },
   email: 'joshualozano2002@gmail.com',
   github: 'https://github.com/joshualozano2002',
-  linkedin: 'https://www.linkedin.com/in/joshua-lozano7/',
+  linkedin: 'https://www.linkedin.com/in/joshlozano/',
 
   // One-line positioning, used in the hero and as the meta description base.
   tagline:
@@ -36,6 +36,17 @@ export const profile = {
     { label: 'Product Operations', detail: 'QA · Linear · Stripe · Intercom', state: 'on' },
   ],
 }
+
+/**
+ * Display helpers so a URL is written once. The handle and the pretty form
+ * were previously hardcoded alongside the link in three files, which is how
+ * they drift apart when a profile moves.
+ */
+export const prettyUrl = (url) =>
+  String(url).replace(/^https?:\/\/(www\.)?/, '').replace(/\/$/, '')
+
+export const handleOf = (url) =>
+  String(url).replace(/\/$/, '').split('/').pop()
 
 export const nav = [
   { to: '/', label: 'Deck', code: 'DCK' },

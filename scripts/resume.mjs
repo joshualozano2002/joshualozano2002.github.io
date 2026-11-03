@@ -15,7 +15,7 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 
-import { profile } from '../src/data/profile.js'
+import { profile, prettyUrl } from '../src/data/profile.js'
 import { dossier } from '../src/data/dossier.js'
 import { missions } from '../src/data/missions.js'
 
@@ -37,8 +37,8 @@ const PROJECT_SLUGS = ['modern-faith-works', 'wildfire-classifier', 'bnf-interpr
 const CONTACT = [
   { text: profile.email, href: `mailto:${profile.email}` },
   { text: 'joshualozano2002.github.io', href: 'https://joshualozano2002.github.io' },
-  { text: 'github.com/joshualozano2002', href: profile.github },
-  { text: 'linkedin.com/in/joshua-lozano7', href: profile.linkedin },
+  { text: prettyUrl(profile.github), href: profile.github },
+  { text: prettyUrl(profile.linkedin), href: profile.linkedin },
 ]
 
 const esc = (s) =>

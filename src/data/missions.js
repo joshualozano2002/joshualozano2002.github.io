@@ -18,7 +18,7 @@ export const missions = [
     diagram: 'narration',
     featured: true,
     summary:
-      'A bilingual guide to California\u2019s Catholic churches: a place directory with interactive interior walkthroughs, and a daily practice layer, on web and Android from one React Native codebase.',
+      'A bilingual guide to the world\u2019s Catholic churches: a place directory with interactive interior walkthroughs, and a daily practice layer, on web and Android from one React Native codebase.',
     brief: [
       'Almost nothing inside a Catholic church is documented for the person standing in it. Parish websites go stale \u2014 mass times worst of all \u2014 and there is no visitor-facing layer at all for the altar, statues, windows and relics that make these buildings historically significant. You can walk into a two-hundred-year-old mission and have no way to learn what you are looking at.',
       'The app answers that by modelling each church interior as a set of catalogued features pinned onto photographs. Tap a dot and you get the written history and studio-voice narration, in English or Spanish. Around that directory sits a practice layer sharing the same backend: daily Mass readings pulled from the official US lectionary, a guided rosary player, a community prayer wall, and a liturgical calendar. Two audiences, one system \u2014 visitors who want to understand a building, and practising Catholics who want daily tools in their own language.',
