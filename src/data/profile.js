@@ -15,7 +15,7 @@ export const profile = {
 
   // Board role at a 501(c)(3) non-profit.
   affiliation: {
-    role: 'Vice President',
+    role: 'Founder',
     org: 'Modern Faith Works',
     url: 'https://modernfaithworks.org',
   },

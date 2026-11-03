@@ -1,6 +1,6 @@
 import Seo from '../components/Seo'
 import { Label, Lamp, Reveal } from '../components/ui'
-import { handleOf, profile } from '../data/profile'
+import { handleOf, prettyUrl, profile } from '../data/profile'
 import { withBase } from '../site'
 
 const channels = [
@@ -9,7 +9,7 @@ const channels = [
   { label: 'LinkedIn', value: handleOf(profile.linkedin), href: profile.linkedin, code: 'SEC', ext: true },
   {
     label: 'Modern Faith Works',
-    value: 'modernfaithworks.org · Vice President',
+    value: `${prettyUrl(profile.affiliation.url)} · ${profile.affiliation.role}`,
     href: profile.affiliation.url,
     code: 'ORG',
     ext: true,

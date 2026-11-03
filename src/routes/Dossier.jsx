@@ -14,7 +14,7 @@ export default function Dossier() {
     <>
       <Seo
         title="Dossier"
-        description={`Resume for ${profile.name} — ${profile.current.title} at ${profile.current.org}, Vice President of Modern Faith Works, former NASA SARP research intern, BS Computer Science from Sonoma State University. React Native, Node, Python, C/C++, PyTorch.`}
+        description={`Resume for ${profile.name} — ${profile.current.title} at ${profile.current.org}, Founder of Modern Faith Works, former NASA SARP research intern, BS Computer Science from Sonoma State University. React Native, Node, Python, C/C++, PyTorch.`}
         path="/dossier"
       />
 
