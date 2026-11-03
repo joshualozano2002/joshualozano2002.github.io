@@ -33,7 +33,7 @@ export const dossier = {
   experience: [
     {
       org: 'Eydora',
-      place: 'Remote',
+      place: 'California',
       role: 'Operations & Technical Program Coordinator',
       period: '2026 — Present',
       current: true,
