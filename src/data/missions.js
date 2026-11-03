@@ -41,6 +41,7 @@ export const missions = [
       'Artifact discovery by tapping dots on photographs, with bilingual written history and studio-voice narration',
       'Daily Mass readings parsed server-side from the official US lectionary in both languages',
       'Guided rosary player, community prayer wall, and a liturgical calendar with feast ranks and season theming',
+      'A daily Mass view and a personal journey log tracking prayer streaks and history',
       'Custom admin panel: content editors, narration manager, analytics, CSV import/export, TOTP two-factor and an audit log',
       'Five scheduled GitHub Actions jobs including a nightly self-verifying encrypted database backup',
     ],
