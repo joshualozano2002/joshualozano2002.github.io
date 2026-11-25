@@ -101,10 +101,74 @@ async function handleTts(request, env, url) {
 }
 
 
+// ---- Christmas gift claims ----------------------------------------------
+// A dead-simple blob store for the wishlist page, so family can see what has
+// already been bought without buying the same thing twice.
+//
+// The worker never learns what any of it means. The browser derives a list id
+// and an AES-GCM key from a shared family passphrase, encrypts the claim
+// client-side, and posts an opaque blob under an opaque id. Everything here
+// is hex ids and ciphertext — which is the point, because the person whose
+// list it is owns this worker and could otherwise just read the KV.
+//
+// One key per claim rather than one document per list, so two people claiming
+// at the same moment cannot clobber each other.
+
+const HEX16 = /^[0-9a-f]{16}$/
+const MAX_BLOB = 2048
+// Long enough to outlive the season, short enough to clean itself up.
+const CLAIM_TTL = 150 * 24 * 60 * 60
+
+async function handleGifts(request, env, url) {
+  if (request.method === 'OPTIONS')
+    return new Response(null, {
+      headers: { ...CORS, 'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS' },
+    })
+
+  const parts = url.pathname.split('/').filter(Boolean) // ['gifts', list, claim?]
+  const list = parts[1]
+  const claim = parts[2]
+  if (!list || !HEX16.test(list)) return new Response('bad list', { status: 400, headers: CORS })
+
+  const prefix = `gift:${list}:`
+
+  if (request.method === 'GET' && !claim) {
+    const found = await env.TTS.list({ prefix })
+    const claims = await Promise.all(
+      found.keys.map(async (k) => ({
+        id: k.name.slice(prefix.length),
+        blob: await env.TTS.get(k.name),
+      })),
+    )
+    return Response.json(
+      { claims: claims.filter((c) => c.blob) },
+      { headers: { ...CORS, 'Cache-Control': 'no-store' } },
+    )
+  }
+
+  if (!claim || !HEX16.test(claim)) return new Response('bad claim', { status: 400, headers: CORS })
+
+  if (request.method === 'PUT') {
+    const blob = await request.text()
+    if (!blob || blob.length > MAX_BLOB)
+      return new Response('bad blob', { status: 400, headers: CORS })
+    await env.TTS.put(prefix + claim, blob, { expirationTtl: CLAIM_TTL })
+    return Response.json({ ok: true }, { headers: CORS })
+  }
+
+  if (request.method === 'DELETE') {
+    await env.TTS.delete(prefix + claim)
+    return Response.json({ ok: true }, { headers: CORS })
+  }
+
+  return new Response('method not allowed', { status: 405, headers: CORS })
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url)
     if (url.pathname.startsWith('/tts')) return handleTts(request, env, url)
+    if (url.pathname.startsWith('/gifts')) return handleGifts(request, env, url)
     const m = url.pathname.match(/^\/room\/([a-zA-Z0-9-]{4,40})$/)
     if (!m) return new Response('draft fight party worker', { status: 200 })
     const id = env.ROOMS.idFromName(m[1])

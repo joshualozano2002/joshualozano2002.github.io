@@ -44,6 +44,17 @@
     overflow-x: hidden;
   }
 
+  /* One string of lights, shared by the festive bezel and the garland rule. */
+  :root {
+    --lights-image: linear-gradient(
+      90deg,
+      color-mix(in oklab, var(--color-beacon) 88%, transparent) 0 6px,
+      transparent 6px 22px,
+      color-mix(in oklab, var(--color-annunciator) 88%, transparent) 22px 28px,
+      transparent 28px 56px
+    );
+  }
+
   ::selection {
     background: color-mix(in oklab, var(--color-amber) 32%, transparent);
     color: #fff;
@@ -100,16 +111,64 @@
    */
   .panel-lights::before {
     height: 2px;
-    background-image: linear-gradient(
-      90deg,
-      color-mix(in oklab, var(--color-beacon) 88%, transparent) 0 6px,
-      transparent 6px 22px,
-      color-mix(in oklab, var(--color-annunciator) 88%, transparent) 22px 28px,
-      transparent 28px 56px
-    );
+    background-image: var(--lights-image);
     background-size: 56px 2px;
     background-repeat: repeat-x;
     animation: lights-chase 7s linear infinite;
+  }
+
+  /* The same string of lights as a standalone rule — a garland divider. */
+  .lights-rule {
+    height: 2px;
+    background-image: var(--lights-image);
+    background-size: 56px 2px;
+    background-repeat: repeat-x;
+    animation: lights-chase 7s linear infinite;
+  }
+  /* Offset so adjacent garlands twinkle out of step with each other. */
+  .lights-rule-alt {
+    animation-delay: -3.5s;
+  }
+
+  /*
+   * Snowfall. Two tiled dot fields drifting at different rates, fixed to the
+   * viewport so the cost stays constant however long the manifest gets.
+   * Purely decorative, so it goes away entirely for reduced motion rather
+   * than freezing mid-fall.
+   */
+  .snowfall {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+  }
+  .snowfall::before,
+  .snowfall::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-repeat: repeat;
+  }
+  .snowfall::before {
+    background-image:
+      radial-gradient(1.6px 1.6px at 30px 20px, color-mix(in oklab, var(--color-ink) 55%, transparent), transparent),
+      radial-gradient(1.2px 1.2px at 150px 120px, color-mix(in oklab, var(--color-ink) 40%, transparent), transparent),
+      radial-gradient(1.6px 1.6px at 95px 175px, color-mix(in oklab, var(--color-ink) 48%, transparent), transparent);
+    background-size: 200px 200px;
+    animation: snow-near 22s linear infinite;
+  }
+  .snowfall::after {
+    background-image:
+      radial-gradient(1.1px 1.1px at 60px 70px, color-mix(in oklab, var(--color-ink) 30%, transparent), transparent),
+      radial-gradient(1.1px 1.1px at 230px 190px, color-mix(in oklab, var(--color-ink) 26%, transparent), transparent),
+      radial-gradient(1.5px 1.5px at 290px 40px, color-mix(in oklab, var(--color-ink) 22%, transparent), transparent);
+    background-size: 320px 320px;
+    animation: snow-far 38s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .snowfall {
+      display: none;
+    }
   }
 
   /* Micro label — the stencilled text silkscreened onto a panel. */
@@ -186,6 +245,18 @@
 @keyframes lights-chase {
   to {
     background-position: 56px 0;
+  }
+}
+
+/* Snow drifts exactly one tile per cycle, so the loop has no seam. */
+@keyframes snow-near {
+  to {
+    background-position: 30px 200px;
+  }
+}
+@keyframes snow-far {
+  to {
+    background-position: -40px 320px;
   }
 }
 
