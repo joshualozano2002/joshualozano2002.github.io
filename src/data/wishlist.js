@@ -450,19 +450,6 @@ export const christmas = {
       note: 'Everything here is under $100. The rest of the list is top-heavy, and nobody should have to buy a monitor to join in.',
       items: [
         {
-          id: '34',
-          name: 'Owala FreeSip bottle',
-          spec: 'Stainless steel \u00b7 24\u201340oz',
-          note: 'Sip or swig from the same lid, which is the whole trick. Colour is the only real decision.',
-          display: '$28 \u2013 $35',
-          status: 'Range',
-          tone: 'amber',
-          low: 28,
-          high: 35,
-          href: 'https://owalalife.com/products/freesip',
-          source: 'Owala',
-        },
-        {
           id: '33',
           name: 'Apple Watch Ultra band',
           spec: '49mm \u00b7 Trail, Alpine, Ocean or Sport',
