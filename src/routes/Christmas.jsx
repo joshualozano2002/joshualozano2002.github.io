@@ -226,6 +226,7 @@ function ShoppingPanel({ shopping }) {
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
               autoComplete="off"
+              required
               className="readout min-w-0 flex-1 rounded-xs border border-hairline bg-panel px-3 py-2.5 text-sm text-ink placeholder:text-mute sm:max-w-44"
             />
             <button
@@ -357,21 +358,28 @@ function Row({ item, lit, tone, shopping }) {
           </span>
           <Label>{item.status}</Label>
 
-          {shopping.status === 'open' ? (
+          {/*
+            Someone else's claim is a label, not a button. It used to be
+            clickable, which meant a relative could wipe another relative's
+            claim just by prodding at it to see what it did.
+          */}
+          {shopping.status === 'open' && taken && !mine ? (
+            <span className="readout mt-1 block w-full rounded-xs border border-hairline px-2.5 py-1.5 text-center text-[10px] tracking-[0.18em] text-mute sm:w-auto">
+              TAKEN{claim.name ? ` · ${claim.name.toUpperCase()}` : ''}
+            </span>
+          ) : null}
+
+          {shopping.status === 'open' && !(taken && !mine) ? (
             <button
               type="button"
               onClick={() => shopping.toggle(item.id, !taken)}
               className={`readout mt-1 w-full rounded-xs border px-2.5 py-1.5 text-[10px] tracking-[0.18em] transition-colors sm:w-auto ${
-                taken
+                mine
                   ? 'border-annunciator/50 text-annunciator hover:bg-annunciator/10'
                   : 'border-hairline text-dim hover:border-hairline-hot hover:text-ink'
               }`}
             >
-              {taken
-                ? mine
-                  ? 'YOURS · UNDO'
-                  : `TAKEN${claim.name ? ` · ${claim.name.toUpperCase()}` : ''}`
-                : 'I AM BUYING THIS'}
+              {mine ? 'YOURS · UNDO' : 'I AM BUYING THIS'}
             </button>
           ) : null}
         </div>
