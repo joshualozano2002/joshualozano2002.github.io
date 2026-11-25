@@ -4,6 +4,7 @@ import { Label, Lamp, Reveal, accentVar } from '../components/ui'
 import { allItems, christmas, groupTotals, totals } from '../data/wishlist'
 import { profile } from '../data/profile'
 import { withBase } from '../site'
+import SnowGlobe from '../christmas/SnowGlobe'
 import {
   SESSION_KEY,
   clearClaim,
@@ -258,24 +259,65 @@ function ShoppingPanel({ shopping }) {
  * Sky
  * ------------------------------------------------------------------ */
 
-/** One reindeer, mid-gallop, built from primitives rather than one path. */
+/**
+ * One reindeer in a flying gallop.
+ *
+ * The silhouette is a single path so the shoulder and neck join cleanly:
+ * back line, rising neck, small wedge head, then the throat and belly back
+ * to the rump. Antlers and legs are strokes, so they keep an even weight at
+ * any scale. Antler tips sit at y≈1, which is why the viewBox starts there.
+ */
 const Reindeer = ({ x }) => (
   <g transform={`translate(${x} 0)`}>
     <path
-      d="M27 6l-3-6M27 6l3-6M24 0l-3-2M30 0l3-2"
+      d="M47 10C46 5.4 43.5 2.8 40 1.2M44.6 8.2C42.6 6.4 40.6 5.4 38 5M45.8 10.4C43.4 9.6 41.2 9.4 39 9.8M50 9.6C51 5 53.4 2.4 57 1M51.6 8C53.6 6 55.6 5 58.2 4.6M50.6 10.2C53 9.4 55.2 9.2 57.4 9.6"
       stroke="currentColor"
-      strokeWidth="1.4"
+      strokeWidth="1.5"
       strokeLinecap="round"
       fill="none"
     />
-    <ellipse cx="28" cy="9" rx="4.2" ry="3.4" />
-    <path d="M22 13L27 8l2 5z" />
-    <ellipse cx="13" cy="15" rx="10" ry="5.6" />
-    <circle cx="3.2" cy="12" r="1.9" />
     <path
-      d="M7 19l-5 7M11 20l-1 7M17 20l4 7M20 18l6 6"
+      d="M6 22C8 17 16 15.5 26 17C30 17.5 33 16 36 13.5C39 11 42 9.5 45.5 9C49 8.6 52 10 54.5 12.5C56.5 14.4 56 16.2 53.6 16.2L47.5 15.6C44 17.5 41 19.5 38.5 21.5C36 23.5 33 25.5 29 27C22 29.4 13 29 8.5 26.5Z"
+      fill="currentColor"
+    />
+    <path d="M6 22C3 20 1.5 17 2.5 14.5C4.5 16.5 6 19 7 21.5Z" fill="currentColor" />
+    <path
+      d="M33 22C37 26 41 30 44 34M30 24C31 28 30 31 28 34M14 26.5C13 30 14 33 16.5 36M9 24C5 27 1.5 30 -2 32"
       stroke="currentColor"
-      strokeWidth="1.7"
+      strokeWidth="2"
+      strokeLinecap="round"
+      fill="none"
+    />
+  </g>
+)
+
+/**
+ * The sleigh: scrolled runner, a seat that dips between a high back and a
+ * raised front lip, a sack in the back, and a driver leaning into the reins.
+ */
+const Sleigh = () => (
+  <g>
+    <path
+      d="M2 33h28c7 0 11.5-3.5 13-8.5c0.8-2.7-2-3.7-3-1.5c-0.8 1.8 0.8 3 2.2 2.2"
+      stroke="currentColor"
+      strokeWidth="1.9"
+      strokeLinecap="round"
+      fill="none"
+    />
+    <path d="M10 33v-5M26 33v-5" stroke="currentColor" strokeWidth="1.7" />
+    <path
+      d="M6 29C4 20 7 13 14 13C17 13 18 15 18 18H28C29 15 31 13 34 13C33 20 29.5 26 25 29Z"
+      fill="currentColor"
+    />
+    <path d="M8 13C7 7 10 3.5 14 3.5C18 3.5 20.5 7.5 19 13Z" fill="currentColor" />
+    <path d="M21 18C20.5 13.5 22.5 11 25 11C27.5 11 29.5 13.5 29 18Z" fill="currentColor" />
+    <circle cx="25" cy="8.4" r="3.3" fill="currentColor" />
+    <path d="M22.6 6C24.2 2.8 27.4 2.4 28.8 4.6L25.4 6.8Z" fill="currentColor" />
+    <circle cx="29.4" cy="4.2" r="1.5" fill="currentColor" />
+    <path
+      d="M28 14C31 13.4 34 13.6 37 14.6"
+      stroke="currentColor"
+      strokeWidth="1.8"
       strokeLinecap="round"
       fill="none"
     />
@@ -294,35 +336,18 @@ function SleighSky() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 overflow-hidden"
     >
-      <div className="sleigh-run absolute top-14 left-0 w-60 text-ink/80 sm:w-72">
-        <svg viewBox="0 0 196 34" fill="currentColor" className="w-full">
+      <div className="sleigh-run absolute top-10 left-0 w-80 text-ink/80 sm:w-[27rem]">
+        <svg viewBox="0 0 272 38" fill="none" className="w-full">
           <path
-            d="M34 18C48 16 52 14 60 14M94 14h8M134 14h8"
+            d="M37 15C52 13 60 12 74 12M125 12h11M189 12h11"
             stroke="currentColor"
             strokeWidth="1.1"
-            fill="none"
-            opacity="0.7"
+            opacity="0.6"
           />
-          <path
-            d="M3 27h27q7 0 8-7"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <path d="M5 24q0-9 9-9h13q-2 9-5 9z" />
-          <circle cx="15" cy="10" r="3.3" />
-          <path d="M11 15q4-4 8 0z" />
-          <path
-            d="M17 7q4-1 5 2"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            fill="none"
-          />
-          <Reindeer x={58} />
-          <Reindeer x={98} />
-          <Reindeer x={138} />
+          <Sleigh />
+          <Reindeer x={72} />
+          <Reindeer x={136} />
+          <Reindeer x={200} />
         </svg>
       </div>
     </div>
@@ -530,22 +555,28 @@ export default function Christmas() {
         <SleighSky />
 
         <div className="relative z-10 mx-auto w-full max-w-4xl px-5 py-20 lg:px-8">
-          <div className="mb-5 flex items-center gap-2.5">
-            <Lamp color="beacon" />
-            <Label className="text-beacon">Resupply · Christmas {christmas.year}</Label>
+          <div className="flex flex-col gap-12 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
+            <div className="min-w-0 flex-1">
+              <div className="mb-5 flex items-center gap-2.5">
+                <Lamp color="beacon" />
+                <Label className="text-beacon">Resupply · Christmas {christmas.year}</Label>
+              </div>
+
+              <h1 className="font-display text-4xl font-bold tracking-tight text-balance sm:text-5xl">
+                Christmas list
+              </h1>
+
+              <div aria-hidden="true" className="lights-rule mt-6 max-w-sm" />
+
+              <p className="mt-6 max-w-xl text-base leading-relaxed text-dim text-pretty sm:text-lg">
+                {totals.items} items across five holds, with the prices I saw when I wrote them
+                down. Some are worth waiting for a sale on and a few are still open — the
+                manifest says which is which.
+              </p>
+            </div>
+
+            <SnowGlobe className="mx-auto lg:mx-0" />
           </div>
-
-          <h1 className="font-display text-4xl font-bold tracking-tight text-balance sm:text-5xl">
-            Christmas list
-          </h1>
-
-          <div aria-hidden="true" className="lights-rule mt-6 max-w-sm" />
-
-          <p className="mt-6 max-w-xl text-base leading-relaxed text-dim text-pretty sm:text-lg">
-            {totals.items} items across five holds, with the prices I saw when I wrote them down.
-            Some are worth waiting for a sale on and a few are still open — the manifest says
-            which is which.
-          </p>
 
           <ShoppingPanel shopping={shopping} />
 
