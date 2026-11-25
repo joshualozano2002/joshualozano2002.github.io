@@ -45,7 +45,7 @@ export const christmas = {
           id: '02',
           name: 'Alienware AW3225QF 32" QD-OLED',
           spec: 'Curved 4K · 240Hz · QD-OLED',
-          note: 'Promotional price, so the window matters more than the date.',
+          note: 'Dell have it at $300 off a $999.99 list, which is a real discount rather than a permanent fake one \u2014 so the window matters more than the date. Curved is what makes it hard to replace: almost every rival 32" 4K 240Hz QD-OLED is flat.',
           display: '$699.99',
           status: 'Promo price',
           tone: 'red',
