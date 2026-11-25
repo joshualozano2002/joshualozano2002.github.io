@@ -100,8 +100,8 @@ export const christmas = {
         {
           id: '07',
           name: 'Measy W2H Wireless HDMI Transmitter',
-          spec: 'Wireless HDMI · transmitter + receiver',
-          note: 'Compatibility not confirmed yet — worth checking before buying.',
+          spec: '4K · 60GHz · transmitter + receiver',
+          note: 'The 4K 60GHz kit, not the W2H Nano — Measy sell a 1080p unit under a near-identical name for a quarter of the price, and the pictures look nothing alike. Compatibility still not confirmed, so worth checking before buying either way.',
           display: '$265.17',
           status: 'Pending check',
           tone: 'amber',
