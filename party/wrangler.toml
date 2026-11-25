@@ -6,9 +6,19 @@ compatibility_date = "2026-08-01"
 name = "ROOMS"
 class_name = "Room"
 
+# One object per Christmas list. Strongly consistent, unlike KV, so a gift
+# claim is visible to every other shopper the moment it is saved.
+[[durable_objects.bindings]]
+name = "GIFTS"
+class_name = "Gifts"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["Room"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["Gifts"]
 
 [[kv_namespaces]]
 binding = "TTS"

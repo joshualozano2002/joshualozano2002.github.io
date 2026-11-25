@@ -109,59 +109,31 @@ async function handleTts(request, env, url) {
 // and an AES-GCM key from a shared family passphrase, encrypts the claim
 // client-side, and posts an opaque blob under an opaque id. Everything here
 // is hex ids and ciphertext — which is the point, because the person whose
-// list it is owns this worker and could otherwise just read the KV.
+// list it is owns this worker and could otherwise just read the storage.
 //
-// One key per claim rather than one document per list, so two people claiming
-// at the same moment cannot clobber each other.
+// One Durable Object per list, rather than KV, because KV list reads are
+// eventually consistent: a claim took a measured 16 seconds to become visible
+// to a second reader, and two relatives shopping the same evening is the
+// exact case this feature exists for. A DO is strongly consistent and
+// single-threaded, so a claim is visible to everyone the moment it returns.
 
 const HEX16 = /^[0-9a-f]{16}$/
 const MAX_BLOB = 2048
-// Long enough to outlive the season, short enough to clean itself up.
-const CLAIM_TTL = 150 * 24 * 60 * 60
+// Long enough to outlive the season. Refreshed on every write, so a list
+// tidies itself up once it stops being used.
+const CLAIM_TTL_MS = 150 * 24 * 60 * 60 * 1000
 
-async function handleGifts(request, env, url) {
-  if (request.method === 'OPTIONS')
-    return new Response(null, {
-      headers: { ...CORS, 'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS' },
-    })
+const GIFT_CORS = { ...CORS, 'Access-Control-Allow-Methods': 'GET, PUT, DELETE, OPTIONS' }
 
-  const parts = url.pathname.split('/').filter(Boolean) // ['gifts', list, claim?]
-  const list = parts[1]
-  const claim = parts[2]
-  if (!list || !HEX16.test(list)) return new Response('bad list', { status: 400, headers: CORS })
+function handleGifts(request, env, url) {
+  if (request.method === 'OPTIONS') return new Response(null, { headers: GIFT_CORS })
 
-  const prefix = `gift:${list}:`
+  // ['gifts', list, claim?] — the list id picks the Durable Object.
+  const list = url.pathname.split('/').filter(Boolean)[1]
+  if (!list || !HEX16.test(list))
+    return new Response('bad list', { status: 400, headers: GIFT_CORS })
 
-  if (request.method === 'GET' && !claim) {
-    const found = await env.TTS.list({ prefix })
-    const claims = await Promise.all(
-      found.keys.map(async (k) => ({
-        id: k.name.slice(prefix.length),
-        blob: await env.TTS.get(k.name),
-      })),
-    )
-    return Response.json(
-      { claims: claims.filter((c) => c.blob) },
-      { headers: { ...CORS, 'Cache-Control': 'no-store' } },
-    )
-  }
-
-  if (!claim || !HEX16.test(claim)) return new Response('bad claim', { status: 400, headers: CORS })
-
-  if (request.method === 'PUT') {
-    const blob = await request.text()
-    if (!blob || blob.length > MAX_BLOB)
-      return new Response('bad blob', { status: 400, headers: CORS })
-    await env.TTS.put(prefix + claim, blob, { expirationTtl: CLAIM_TTL })
-    return Response.json({ ok: true }, { headers: CORS })
-  }
-
-  if (request.method === 'DELETE') {
-    await env.TTS.delete(prefix + claim)
-    return Response.json({ ok: true }, { headers: CORS })
-  }
-
-  return new Response('method not allowed', { status: 405, headers: CORS })
+  return env.GIFTS.get(env.GIFTS.idFromName(list)).fetch(request)
 }
 
 export default {
@@ -246,5 +218,53 @@ export class Room {
         this.sessions.delete(s)
       }
     }
+  }
+}
+
+/**
+ * One list's claims. Keys are `c:<claimId>`, values are ciphertext.
+ *
+ * Writes are serialised by the runtime, so two people claiming at the same
+ * instant cannot clobber each other, and a read immediately after a write
+ * always sees it.
+ */
+export class Gifts {
+  constructor(state) {
+    this.state = state
+  }
+
+  async fetch(request) {
+    const url = new URL(request.url)
+    const claim = url.pathname.split('/').filter(Boolean)[2]
+
+    if (request.method === 'GET' && !claim) {
+      const stored = await this.state.storage.list({ prefix: 'c:' })
+      const claims = [...stored].map(([k, blob]) => ({ id: k.slice(2), blob }))
+      return Response.json({ claims }, { headers: { ...GIFT_CORS, 'Cache-Control': 'no-store' } })
+    }
+
+    if (!claim || !HEX16.test(claim))
+      return new Response('bad claim', { status: 400, headers: GIFT_CORS })
+
+    if (request.method === 'PUT') {
+      const blob = await request.text()
+      if (!blob || blob.length > MAX_BLOB)
+        return new Response('bad blob', { status: 400, headers: GIFT_CORS })
+      await this.state.storage.put(`c:${claim}`, blob)
+      await this.state.storage.setAlarm(Date.now() + CLAIM_TTL_MS)
+      return Response.json({ ok: true }, { headers: GIFT_CORS })
+    }
+
+    if (request.method === 'DELETE') {
+      await this.state.storage.delete(`c:${claim}`)
+      return Response.json({ ok: true }, { headers: GIFT_CORS })
+    }
+
+    return new Response('method not allowed', { status: 405, headers: GIFT_CORS })
+  }
+
+  /** Nothing written for a season: forget the whole list. */
+  async alarm() {
+    await this.state.storage.deleteAll()
   }
 }
