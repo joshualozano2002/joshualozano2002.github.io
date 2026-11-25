@@ -32,6 +32,14 @@ function daysUntil({ y, m, d }) {
   return Math.round((target - today) / 86400000)
 }
 
+/**
+ * Where the sleigh is headed. From the pole the great circle runs straight
+ * down a meridian, so the distance is simply the latitude difference, at the
+ * nautical mile's own definition of one minute of arc.
+ */
+const DESTINATION = { name: 'Thousand Oaks, CA', lat: 34.1706 }
+const DISTANCE_NM = Math.round((90 - DESTINATION.lat) * 60)
+
 const byId = Object.fromEntries(allItems.map((i) => [i.id, i]))
 
 /** Reverse of `needs`: who is waiting on this item. */
@@ -247,6 +255,81 @@ function ShoppingPanel({ shopping }) {
 }
 
 /* ------------------------------------------------------------------ *
+ * Sky
+ * ------------------------------------------------------------------ */
+
+/** One reindeer, mid-gallop, built from primitives rather than one path. */
+const Reindeer = ({ x }) => (
+  <g transform={`translate(${x} 0)`}>
+    <path
+      d="M27 6l-3-6M27 6l3-6M24 0l-3-2M30 0l3-2"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      fill="none"
+    />
+    <ellipse cx="28" cy="9" rx="4.2" ry="3.4" />
+    <path d="M22 13L27 8l2 5z" />
+    <ellipse cx="13" cy="15" rx="10" ry="5.6" />
+    <circle cx="3.2" cy="12" r="1.9" />
+    <path
+      d="M7 19l-5 7M11 20l-1 7M17 20l4 7M20 18l6 6"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      fill="none"
+    />
+  </g>
+)
+
+/**
+ * The sleigh crossing the hero sky.
+ *
+ * Decorative, so it is aria-hidden and sits behind the content. Under
+ * prefers-reduced-motion it parks mid-flight rather than disappearing.
+ */
+function SleighSky() {
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 overflow-hidden"
+    >
+      <div className="sleigh-run absolute top-14 left-0 w-60 text-ink/80 sm:w-72">
+        <svg viewBox="0 0 196 34" fill="currentColor" className="w-full">
+          <path
+            d="M34 18C48 16 52 14 60 14M94 14h8M134 14h8"
+            stroke="currentColor"
+            strokeWidth="1.1"
+            fill="none"
+            opacity="0.7"
+          />
+          <path
+            d="M3 27h27q7 0 8-7"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <path d="M5 24q0-9 9-9h13q-2 9-5 9z" />
+          <circle cx="15" cy="10" r="3.3" />
+          <path d="M11 15q4-4 8 0z" />
+          <path
+            d="M17 7q4-1 5 2"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+            fill="none"
+          />
+          <Reindeer x={58} />
+          <Reindeer x={98} />
+          <Reindeer x={138} />
+        </svg>
+      </div>
+    </div>
+  )
+}
+
+/* ------------------------------------------------------------------ *
  * Rows
  * ------------------------------------------------------------------ */
 
@@ -293,7 +376,13 @@ function Row({ item, lit, tone, shopping }) {
       <div className="flex flex-col gap-4 py-7 sm:flex-row sm:items-start sm:gap-5">
         <div className="flex shrink-0 items-start gap-4">
           <div className="flex w-14 shrink-0 items-center gap-2 pt-1.5 sm:w-16">
-            <Lamp color={tone} on={lit} />
+            {/* Offset per row so the lamps breathe out of step, like a string. */}
+            <span
+              className="twinkle flex"
+              style={{ animationDelay: `${(Number(item.id) % 7) * 0.45}s` }}
+            >
+              <Lamp color={tone} on={lit} />
+            </span>
             <span className="readout text-[10px] tracking-[0.2em] text-mute">{item.id}</span>
           </div>
           <Thumb item={item} />
@@ -434,9 +523,11 @@ export default function Christmas() {
       />
 
       <div aria-hidden="true" className="snowfall" />
+      <div aria-hidden="true" className="snowfall-deep" />
 
       <section className="relative min-h-dvh pt-14">
         <div aria-hidden="true" className="absolute inset-0 grid-bg mask-fade opacity-40" />
+        <SleighSky />
 
         <div className="relative z-10 mx-auto w-full max-w-4xl px-5 py-20 lg:px-8">
           <div className="mb-5 flex items-center gap-2.5">
@@ -458,9 +549,52 @@ export default function Christmas() {
 
           <ShoppingPanel shopping={shopping} />
 
+          {/* Sleigh flight plan: the countdown, as an instrument would give it. */}
+          <Reveal>
+            <div className="panel panel-lights snow-cap mt-10">
+              <div className="flex flex-col gap-6 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+                <div className="min-w-0">
+                  <div className="mb-3 flex items-center gap-2">
+                    <svg
+                      aria-hidden="true"
+                      viewBox="0 0 24 24"
+                      className="star-pulse size-3.5 text-amber"
+                      fill="currentColor"
+                    >
+                      <path d="M12 0l2.6 8.2L23 10.8l-7 5 2.6 8.2-6.6-5.1L5.4 24 8 15.8l-7-5 8.4-2.6z" />
+                    </svg>
+                    <Label className="text-amber">Sleigh flight plan</Label>
+                  </div>
+                  <dl className="space-y-2">
+                    {[
+                      ['Origin', "North Pole · 90°00′N"],
+                      ['Destination', `${DESTINATION.name} · 34°10′N`],
+                      ['Great circle', `${DISTANCE_NM.toLocaleString('en-US')} NM`],
+                    ].map(([k, v]) => (
+                      <div key={k} className="flex flex-wrap items-baseline gap-x-3">
+                        <dt className="label w-24 shrink-0">{k}</dt>
+                        <dd className="readout text-xs text-dim">{v}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                </div>
+
+                <div className="shrink-0 border-t border-hairline pt-5 sm:border-t-0 sm:border-l sm:pt-0 sm:pl-7">
+                  <Label className="mb-1.5">Touchdown</Label>
+                  <div className="readout text-3xl leading-none font-medium text-beacon sm:text-4xl">
+                    {countdown}
+                  </div>
+                  <div className="readout mt-2 text-[10px] tracking-[0.2em] text-mute">
+                    25 DEC {christmas.year} · 00:00 LOCAL
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+
           {/* Manifest summary. */}
           <Reveal>
-            <div className="panel panel-lights mt-10 p-5 sm:p-7">
+            <div className="panel panel-lights snow-cap mt-10 p-5 sm:p-7">
               <dl className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
                 {readouts.map((r) => (
                   <div key={r.k} className="flex flex-col gap-1 border-l border-hairline pl-3">
