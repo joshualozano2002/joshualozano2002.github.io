@@ -154,7 +154,7 @@ export const christmas = {
           tone: 'green',
           low: 239.95,
           high: 239.95,
-          href: 'https://www.bestbuy.com/site/cyberpower-pfc-sinewave-series-1500va-battery-back-up-system-black/11137298.p',
+          href: 'https://www.bestbuy.com/product/cyberpower-pfc-sinewave-series-1500va-battery-back-up-system-black/JX8P9297PT',
           source: 'Best Buy',
         },
       ],
