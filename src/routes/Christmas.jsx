@@ -38,8 +38,12 @@ function daysUntil({ y, m, d }) {
  * down a meridian, so the distance is simply the latitude difference, at the
  * nautical mile's own definition of one minute of arc.
  */
-const DESTINATION = { name: 'Thousand Oaks, CA', lat: 34.1706 }
+const DESTINATION = { name: 'Oxnard, CA', lat: 34.1975 }
 const DISTANCE_NM = Math.round((90 - DESTINATION.lat) * 60)
+
+/** 34.1975 -> 34°12′N. Derived, so the printed position cannot drift. */
+const dms = (lat) =>
+  `${Math.floor(lat)}°${String(Math.round((lat % 1) * 60)).padStart(2, '0')}′N`
 
 const byId = Object.fromEntries(allItems.map((i) => [i.id, i]))
 
@@ -631,7 +635,7 @@ export default function Christmas() {
                   <dl className="space-y-2">
                     {[
                       ['Origin', "North Pole · 90°00′N"],
-                      ['Destination', `${DESTINATION.name} · 34°10′N`],
+                      ['Destination', `${DESTINATION.name} · ${dms(DESTINATION.lat)}`],
                       ['Great circle', `${DISTANCE_NM.toLocaleString('en-US')} NM`],
                     ].map(([k, v]) => (
                       <div key={k} className="flex flex-wrap items-baseline gap-x-3">
