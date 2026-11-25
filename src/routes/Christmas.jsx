@@ -227,20 +227,25 @@ function ShoppingPanel({ shopping }) {
  * Rows
  * ------------------------------------------------------------------ */
 
-/** Product shot where there is one, stencilled plate where there is not. */
+/**
+ * Product shot where there is one, stencilled plate where there is not.
+ *
+ * The filename is the item id by convention rather than a field in the data,
+ * so dropping `28.webp` into public/media/wishlist is the whole job. A photo
+ * that is missing falls back instead of leaving a broken image.
+ */
 function Thumb({ item }) {
   const [failed, setFailed] = useState(false)
-  const src = item.image ? withBase(`media/wishlist/${item.image}`) : null
 
-  if (src && !failed) {
+  if (!failed) {
     return (
       <img
-        src={src}
+        src={withBase(`media/wishlist/${item.id}.webp`)}
         alt=""
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
-        className="size-16 shrink-0 rounded-xs border border-hairline bg-raised object-contain p-1 sm:size-20"
+        className="size-16 shrink-0 rounded-xs border border-hairline bg-ink/95 object-contain p-1 sm:size-20"
       />
     )
   }
