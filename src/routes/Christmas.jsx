@@ -32,6 +32,28 @@ function daysUntil({ y, m, d }) {
   return Math.round((target - today) / 86400000)
 }
 
+const byId = Object.fromEntries(allItems.map((i) => [i.id, i]))
+
+/** Reverse of `needs`: who is waiting on this item. */
+const neededBy = allItems.reduce((map, item) => {
+  for (const id of item.needs ?? []) (map[id] ??= []).push(item.id)
+  return map
+}, {})
+
+/**
+ * Both directions of the dependency, as one list of lines.
+ *
+ * A pair that declares the link from both sides — the NAS and its drives are
+ * useless without each other — would otherwise print the same fact twice, so
+ * the reverse direction drops anything the item already states itself.
+ */
+const dependencies = (item) => [
+  ...(item.needs ?? []).map((id) => ({ key: `n${id}`, verb: 'Needs', id })),
+  ...(neededBy[item.id] ?? [])
+    .filter((id) => !(item.needs ?? []).includes(id))
+    .map((id) => ({ key: `b${id}`, verb: 'Needed by', id })),
+]
+
 /* ------------------------------------------------------------------ *
  * Shopping mode
  * ------------------------------------------------------------------ */
@@ -260,6 +282,7 @@ function Thumb({ item }) {
 }
 
 function Row({ item, lit, tone, shopping }) {
+  const deps = dependencies(item)
   const claim = shopping.status === 'open' ? shopping.claims.get(item.id) : null
   const taken = Boolean(claim)
   const mine = taken && claim.name === shopping.crew?.name
@@ -284,6 +307,17 @@ function Row({ item, lit, tone, shopping }) {
             {item.name}
           </h3>
           <p className="readout mt-1.5 text-[11px] tracking-wide text-mute">{item.spec}</p>
+
+          {deps.length ? (
+            <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
+              {deps.map((d) => (
+                <li key={d.key} className="label flex items-center gap-1.5 text-amber">
+                  <Lamp color="amber" />
+                  {d.verb} {d.id} · {byId[d.id].name}
+                </li>
+              ))}
+            </ul>
+          ) : null}
 
           {item.note ? (
             <p className="mt-2.5 max-w-prose text-sm leading-relaxed text-dim text-pretty">

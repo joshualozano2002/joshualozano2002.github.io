@@ -12,6 +12,10 @@
  * `tone` colours the price and the status, and says what kind of number it
  * is: green for a firm listed price, red for a promotional one, amber for
  * anything still moving, and mute for anything unpriced.
+ *
+ * `needs` lists the ids an item does not work without, which the page shows
+ * on both rows. A diskless NAS and surround speakers with no soundbar are
+ * the kind of thing someone buys on its own and only then finds out.
  */
 export const christmas = {
   year: 2026,
@@ -107,12 +111,39 @@ export const christmas = {
         {
           id: '08',
           name: 'UGREEN NASync DXP4800 Pro',
-          spec: '4-bay NAS',
+          spec: '4-bay NAS · ships empty',
+          note: 'Sold diskless. On its own it is an enclosure with nothing in it.',
+          needs: ['29'],
           display: '$639.99',
           status: 'Listed',
           tone: 'green',
           low: 639.99,
           high: 639.99,
+        },
+        {
+          id: '29',
+          name: 'Seagate IronWolf Pro 12TB × 2',
+          spec: 'NAS drives · 7200rpm · CMR',
+          note: 'What actually makes the NAS a NAS. Two mirrored drives is the sensible start and still leaves two bays free; street price swings a lot, so this is one to catch on a sale.',
+          needs: ['08'],
+          display: '$460 – $600',
+          status: 'Range',
+          tone: 'amber',
+          low: 460,
+          high: 600,
+        },
+        {
+          id: '30',
+          name: 'CyberPower CP1500PFCLCD',
+          spec: '1500VA · sine wave · 12 outlets',
+          note: 'A battery that sits between the wall and the desk. When the power cuts it keeps everything running for a few minutes — long enough for the NAS to finish what it was writing and shut down cleanly instead of losing the array mid-write.',
+          display: '$239.95',
+          status: 'Listed',
+          tone: 'green',
+          low: 239.95,
+          high: 239.95,
+          href: 'https://www.bestbuy.com/site/cyberpower-pfc-sinewave-series-1500va-battery-back-up-system-black/11137298.p',
+          source: 'Best Buy',
         },
       ],
     },
@@ -136,7 +167,8 @@ export const christmas = {
           id: '10',
           name: 'Sonos surround expansion',
           spec: 'Sub 4 · two Era 300 speakers',
-          note: 'Pairs with the Arc Ultra. Priced per piece, so the total depends on how much of it gets filled in.',
+          note: 'Priced per piece, so the total depends on how much of it gets filled in.',
+          needs: ['09'],
           display: 'TBD',
           status: 'Unpriced',
           tone: 'mute',
@@ -204,13 +236,28 @@ export const christmas = {
           low: 400,
           high: 900,
         },
+        {
+          id: '31',
+          name: 'EMF shielding fabric for the Tesla',
+          spec: 'Conductive fabric · cut to fit under the mats',
+          note: 'Laid under the floor mats on whichever side reads highest. Worth knowing first: the attenuation figures sellers quote are their own rather than independent test results, and fabric like this targets radio frequencies, not the low-frequency magnetic fields a battery and motor actually produce. Measuring the cabin would say whether it is worth doing at all.',
+          options: [
+            { label: 'By the foot', items: ['WOREMOR WM-SGM150', 'EMR Shielding Solutions'] },
+            { label: 'Ready-made', items: ['Tachyonized Car-Mate mats', 'Copper Faraday fabric'] },
+          ],
+          display: 'TBD',
+          status: 'Needs sizing',
+          tone: 'mute',
+          low: null,
+          high: null,
+        },
       ],
     },
 
     {
       id: 'clubs',
       hold: 'Hold 03',
-      title: 'Golf Clubs',
+      title: 'Golf Clubs & Bag',
       note: 'All clubs brand-new and right-handed. Shaft flex and final configurations still to be decided.',
       items: [
         {
@@ -273,6 +320,19 @@ export const christmas = {
           tone: 'green',
           low: 129.98,
           high: 129.98,
+        },
+        {
+          id: '28',
+          name: 'Callaway ORG 14 Cart Bag',
+          spec: '14-way top · cart bag · 2026',
+          note: 'Nothing on the list carries the clubs yet. A 14-way top keeps a full set separated, and it matches the rest of the bag. If I end up walking more than riding, a stand bag \u2014 Callaway Chev Dry, Ping Hoofer, Sun Mountain 2.5+ \u2014 is the swap to make instead.',
+          display: '$270 \u2013 $325',
+          status: 'Range',
+          tone: 'amber',
+          low: 270,
+          high: 325,
+          href: 'https://www.golfdiscount.com/collections/brands-callaway/products/callaway-2026-org-14-cart-bag',
+          source: 'Golf Discount',
         },
       ],
     },
