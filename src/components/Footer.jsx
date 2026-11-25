@@ -23,10 +23,10 @@ export default function Footer() {
 
         <div>
           <Label className="mb-3">Stations</Label>
-          <ul className="space-y-2">
+          <ul className="space-y-1 sm:space-y-2">
             {nav.map((n) => (
               <li key={n.to}>
-                <Link to={n.to} className="text-sm text-dim transition-colors hover:text-ink">
+                <Link to={n.to} className="inline-flex min-h-11 items-center text-sm text-dim transition-colors hover:text-ink sm:min-h-0">
                   {n.label}
                 </Link>
               </li>
@@ -36,13 +36,13 @@ export default function Footer() {
 
         <div>
           <Label className="mb-3">Elsewhere</Label>
-          <ul className="space-y-2">
+          <ul className="space-y-1 sm:space-y-2">
             <li>
               <a
                 href={profile.github}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-dim transition-colors hover:text-ink"
+                className="inline-flex min-h-11 items-center text-sm text-dim transition-colors hover:text-ink sm:min-h-0"
               >
                 GitHub
               </a>
@@ -52,7 +52,7 @@ export default function Footer() {
                 href={profile.linkedin}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-dim transition-colors hover:text-ink"
+                className="inline-flex min-h-11 items-center text-sm text-dim transition-colors hover:text-ink sm:min-h-0"
               >
                 LinkedIn
               </a>
@@ -62,7 +62,7 @@ export default function Footer() {
                 href={profile.affiliation.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-dim transition-colors hover:text-ink"
+                className="inline-flex min-h-11 items-center text-sm text-dim transition-colors hover:text-ink sm:min-h-0"
               >
                 {profile.affiliation.org}
               </a>

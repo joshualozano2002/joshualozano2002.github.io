@@ -76,7 +76,7 @@ export default function Nav() {
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls="mobile-nav"
-          className="flex items-center gap-2 rounded-xs border border-hairline px-3 py-1.5 md:hidden"
+          className="flex min-h-11 items-center gap-2 rounded-xs border border-hairline px-3.5 md:hidden"
         >
           <Lamp on={open} color="amber" />
           <span className="label text-ink">{open ? 'Close' : 'Menu'}</span>

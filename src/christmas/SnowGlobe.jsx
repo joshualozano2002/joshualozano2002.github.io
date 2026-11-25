@@ -215,6 +215,35 @@ export default function SnowGlobe({ className = '' }) {
 
     let raf
     let last = performance.now()
+    let running = true
+
+    /**
+     * A canvas painting sixty times a second off the bottom of a phone
+     * screen is pure battery. Run only while it is both on screen and in a
+     * foreground tab, and reset the clock on resume so the step clamp is
+     * not handed a delta measured in minutes.
+     */
+    let onScreen = true
+    const sync = () => {
+      const next = onScreen && !document.hidden
+      if (next === running) return
+      running = next
+      if (running) {
+        last = performance.now()
+        raf = requestAnimationFrame(frame)
+      } else {
+        cancelAnimationFrame(raf)
+      }
+    }
+    const io = new IntersectionObserver(
+      ([e]) => {
+        onScreen = e.isIntersecting
+        sync()
+      },
+      { rootMargin: '120px' },
+    )
+    io.observe(canvas)
+    document.addEventListener('visibilitychange', sync)
 
     function frame(now = performance.now()) {
       // Step in 60fps-equivalents rather than frames, so the snow falls at
@@ -263,10 +292,14 @@ export default function SnowGlobe({ className = '' }) {
       drawFlakes()
       drawGlare()
       drawBase()
-      raf = requestAnimationFrame(frame)
+      if (running) raf = requestAnimationFrame(frame)
     }
     frame()
-    return () => cancelAnimationFrame(raf)
+    return () => {
+      cancelAnimationFrame(raf)
+      io.disconnect()
+      document.removeEventListener('visibilitychange', sync)
+    }
   }, [])
 
   return (

@@ -177,7 +177,7 @@ function ShoppingPanel({ shopping }) {
           <button
             type="button"
             onClick={shopping.close}
-            className="readout text-[11px] tracking-[0.2em] text-dim underline-offset-4 hover:text-amber hover:underline"
+            className="readout inline-flex min-h-11 items-center text-xs tracking-[0.2em] text-dim underline-offset-4 hover:text-amber hover:underline sm:min-h-0 sm:text-[11px]"
           >
             LEAVE ↗
           </button>
@@ -202,7 +202,7 @@ function ShoppingPanel({ shopping }) {
           <button
             type="button"
             onClick={() => setShowForm(true)}
-            className="readout shrink-0 rounded-xs border border-hairline px-3.5 py-2 text-[11px] tracking-[0.2em] text-dim transition-colors hover:border-hairline-hot hover:text-ink"
+            className="readout inline-flex min-h-11 shrink-0 items-center rounded-xs border border-hairline px-4 text-xs tracking-[0.2em] text-dim transition-colors hover:border-hairline-hot hover:text-ink sm:min-h-0 sm:py-2 sm:text-[11px]"
           >
             SHOPPING MODE
           </button>
@@ -231,7 +231,7 @@ function ShoppingPanel({ shopping }) {
               placeholder="Family code"
               autoComplete="off"
               required
-              className="readout min-w-0 flex-1 rounded-xs border border-hairline bg-panel px-3 py-2.5 text-sm text-ink placeholder:text-mute"
+              className="readout min-h-12 min-w-0 flex-1 rounded-xs border border-hairline bg-panel px-3 text-base text-ink placeholder:text-mute sm:min-h-0 sm:py-2.5 sm:text-sm"
             />
             <input
               type="text"
@@ -240,12 +240,12 @@ function ShoppingPanel({ shopping }) {
               placeholder="Your name"
               autoComplete="off"
               required
-              className="readout min-w-0 flex-1 rounded-xs border border-hairline bg-panel px-3 py-2.5 text-sm text-ink placeholder:text-mute sm:max-w-44"
+              className="readout min-h-12 min-w-0 flex-1 rounded-xs border border-hairline bg-panel px-3 text-base text-ink placeholder:text-mute sm:max-w-44 sm:min-h-0 sm:py-2.5 sm:text-sm"
             />
             <button
               type="submit"
               disabled={status === 'opening'}
-              className="readout shrink-0 rounded-xs border border-amber/60 px-4 py-2.5 text-[11px] tracking-[0.2em] text-amber transition-colors hover:bg-amber/10 disabled:opacity-50"
+              className="readout min-h-12 shrink-0 rounded-xs border border-amber/60 px-4 text-xs tracking-[0.2em] text-amber transition-colors hover:bg-amber/10 disabled:opacity-50 sm:min-h-0 sm:py-2.5 sm:text-[11px]"
             >
               {status === 'opening' ? 'OPENING…' : 'ENTER'}
             </button>
@@ -401,7 +401,7 @@ function SleighSky() {
  * so dropping `28.webp` into public/media/wishlist is the whole job. A photo
  * that is missing falls back instead of leaving a broken image.
  */
-function Thumb({ item }) {
+function Thumb({ item, className = '' }) {
   const [failed, setFailed] = useState(false)
 
   if (!failed) {
@@ -412,14 +412,14 @@ function Thumb({ item }) {
         loading="lazy"
         decoding="async"
         onError={() => setFailed(true)}
-        className="size-16 shrink-0 rounded-xs border border-hairline bg-ink/95 object-contain p-1 sm:size-20"
+        className={`size-16 shrink-0 rounded-xs border border-hairline bg-ink/95 object-contain p-1 sm:size-20 ${className}`}
       />
     )
   }
   return (
     <div
       aria-hidden="true"
-      className="grid size-16 shrink-0 place-items-center rounded-xs border border-hairline bg-raised sm:size-20"
+      className={`grid size-16 shrink-0 place-items-center rounded-xs border border-hairline bg-raised sm:size-20 ${className}`}
     >
       <span className="readout text-[11px] tracking-[0.2em] text-mute">{item.id}</span>
     </div>
@@ -432,24 +432,32 @@ function Row({ item, lit, tone, shopping }) {
   const taken = Boolean(claim)
   const mine = taken && claim.name === shopping.crew?.name
 
+  /* Its own column on a wide screen, tucked above the title on a phone. */
+  const idTag = (
+    <>
+      {/* Offset per row so the lamps breathe out of step, like a string. */}
+      <span className="twinkle flex" style={{ animationDelay: `${(Number(item.id) % 7) * 0.45}s` }}>
+        <Lamp color={tone} on={lit} />
+      </span>
+      <span className="readout text-[11px] tracking-[0.2em] text-mute sm:text-[10px]">
+        {item.id}
+      </span>
+    </>
+  )
+
   return (
     <li className={taken ? 'opacity-60 transition-opacity' : undefined}>
-      <div className="flex flex-col gap-4 py-7 sm:flex-row sm:items-start sm:gap-5">
-        <div className="flex shrink-0 items-start gap-4">
-          <div className="flex w-14 shrink-0 items-center gap-2 pt-1.5 sm:w-16">
-            {/* Offset per row so the lamps breathe out of step, like a string. */}
-            <span
-              className="twinkle flex"
-              style={{ animationDelay: `${(Number(item.id) % 7) * 0.45}s` }}
-            >
-              <Lamp color={tone} on={lit} />
-            </span>
-            <span className="readout text-[10px] tracking-[0.2em] text-mute">{item.id}</span>
-          </div>
-          <Thumb item={item} />
-        </div>
+      <div className="flex flex-col gap-4 py-6 sm:flex-row sm:items-start sm:gap-5 sm:py-7">
+        <div className="hidden w-16 shrink-0 items-center gap-2 pt-1.5 sm:flex">{idTag}</div>
 
         <div className="min-w-0 flex-1">
+          {/*
+            Floated rather than a flex column, so on a phone the title and
+            everything under it wrap alongside the picture instead of the
+            picture claiming a whole row to itself.
+          */}
+          <Thumb item={item} className="float-left mr-4 mb-2" />
+          <div className="mb-1 flex items-center gap-2 sm:hidden">{idTag}</div>
           <h3
             className={`font-display text-base font-medium sm:text-lg ${
               taken ? 'text-dim line-through decoration-hairline-hot' : 'text-ink'
@@ -457,12 +465,12 @@ function Row({ item, lit, tone, shopping }) {
           >
             {item.name}
           </h3>
-          <p className="readout mt-1.5 text-[11px] tracking-wide text-mute">{item.spec}</p>
+          <p className="readout mt-1.5 text-xs tracking-wide text-mute sm:text-[11px]">{item.spec}</p>
 
           {deps.length ? (
             <ul className="mt-2.5 flex flex-wrap gap-x-4 gap-y-1">
               {deps.map((d) => (
-                <li key={d.key} className="label flex items-center gap-1.5 text-amber">
+                <li key={d.key} className="label flex items-center gap-1.5 text-[11px] text-amber sm:text-[10px]">
                   <Lamp color="amber" />
                   {d.verb} {d.id} · {byId[d.id].name}
                 </li>
@@ -480,7 +488,7 @@ function Row({ item, lit, tone, shopping }) {
             <dl className="mt-3 space-y-1.5">
               {item.options.map((opt) => (
                 <div key={opt.label} className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                  <dt className="label shrink-0">{opt.label}</dt>
+                  <dt className="label shrink-0 text-[11px] sm:text-[10px]">{opt.label}</dt>
                   <dd className="text-sm text-dim">{opt.items.join(' · ')}</dd>
                 </div>
               ))}
@@ -492,11 +500,13 @@ function Row({ item, lit, tone, shopping }) {
               href={item.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="readout mt-3 inline-block text-[11px] tracking-[0.2em] text-dim underline-offset-4 hover:text-amber hover:underline"
+              className="readout mt-1 -mb-2 inline-flex min-h-11 items-center text-xs tracking-[0.2em] text-dim underline-offset-4 hover:text-amber hover:underline sm:mt-3 sm:mb-0 sm:min-h-0 sm:text-[11px]"
             >
               {item.source.toUpperCase()} ↗
             </a>
           ) : null}
+
+          <div className="clear-both" />
         </div>
 
         <div className="flex shrink-0 items-baseline justify-between gap-4 sm:w-44 sm:flex-col sm:items-end sm:gap-1.5">
@@ -506,7 +516,7 @@ function Row({ item, lit, tone, shopping }) {
           >
             {item.display}
           </span>
-          <Label>{item.status}</Label>
+          <Label className="text-[11px] sm:text-[10px]">{item.status}</Label>
 
           {/*
             Someone else's claim is a label, not a button. It used to be
@@ -514,7 +524,7 @@ function Row({ item, lit, tone, shopping }) {
             claim just by prodding at it to see what it did.
           */}
           {shopping.status === 'open' && taken && !mine ? (
-            <span className="readout mt-1 block w-full rounded-xs border border-hairline px-2.5 py-1.5 text-center text-[10px] tracking-[0.18em] text-mute sm:w-auto">
+            <span className="readout mt-1 flex min-h-11 w-full items-center justify-center rounded-xs border border-hairline px-3 text-center text-[11px] tracking-[0.18em] text-mute sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-[10px]">
               TAKEN{claim.name ? ` · ${claim.name.toUpperCase()}` : ''}
             </span>
           ) : null}
@@ -523,7 +533,7 @@ function Row({ item, lit, tone, shopping }) {
             <button
               type="button"
               onClick={() => shopping.toggle(item.id, !taken)}
-              className={`readout mt-1 w-full rounded-xs border px-2.5 py-1.5 text-[10px] tracking-[0.18em] transition-colors sm:w-auto ${
+              className={`readout mt-1 min-h-11 w-full rounded-xs border px-3 text-[11px] tracking-[0.18em] transition-colors sm:min-h-0 sm:w-auto sm:py-1.5 sm:text-[10px] ${
                 mine
                   ? 'border-annunciator/50 text-annunciator hover:bg-annunciator/10'
                   : 'border-hairline text-dim hover:border-hairline-hot hover:text-ink'
@@ -651,7 +661,7 @@ export default function Christmas() {
                   <div className="readout text-3xl leading-none font-medium text-beacon sm:text-4xl">
                     {countdown}
                   </div>
-                  <div className="readout mt-2 text-[10px] tracking-[0.2em] text-mute">
+                  <div className="readout mt-2 text-[11px] tracking-[0.2em] text-mute sm:text-[10px]">
                     25 DEC {christmas.year} · 00:00 LOCAL
                   </div>
                 </div>
@@ -686,7 +696,7 @@ export default function Christmas() {
                     />
                   ))}
                 </div>
-                <p className="readout mt-2.5 text-[10px] tracking-[0.18em] text-mute">
+                <p className="readout mt-2.5 text-[11px] tracking-[0.18em] text-mute sm:text-[10px]">
                   PRICED ITEMS ONLY
                   {totals.open > 0 ? ` · ${totals.open} STILL OPEN` : ''}
                 </p>
@@ -745,7 +755,7 @@ export default function Christmas() {
 
           <div aria-hidden="true" className="lights-rule mt-16" />
 
-          <p className="readout mt-6 text-[11px] leading-relaxed tracking-wide text-mute">
+          <p className="readout mt-6 text-xs leading-relaxed tracking-wide text-mute sm:text-[11px]">
             Prices are what the listings said when this was written, not quotes. Promotional and
             target figures move, and anything marked open has no price yet.
           </p>

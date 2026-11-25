@@ -207,6 +207,19 @@
       display: none;
     }
   }
+  /*
+   * Three full-viewport layers repainting together is a lot to ask of a
+   * phone GPU, and the slowest one is the least visible. Drop it on small
+   * screens and thin the mid layer.
+   */
+  @media (max-width: 640px) {
+    .snowfall-deep {
+      display: none;
+    }
+    .snowfall::after {
+      opacity: 0.6;
+    }
+  }
 
   /*
    * Snow settling on the top edge of a panel: a row of overlapping drifts
