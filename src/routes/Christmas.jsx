@@ -265,9 +265,9 @@ function ShoppingPanel({ shopping }) {
  * The silhouette is a single path so the shoulder and neck join cleanly:
  * back line, rising neck, small wedge head, then the throat and belly back
  * to the rump. Antlers and legs are strokes, so they keep an even weight at
- * any scale. Antler tips sit at y≈1, which is why the viewBox starts there.
+ * any scale. `lead` lights the nose, because the one at the front is Rudolph.
  */
-const Reindeer = ({ x }) => (
+const Reindeer = ({ x, lead = false }) => (
   <g transform={`translate(${x} 0)`}>
     <path
       d="M47 10C46 5.4 43.5 2.8 40 1.2M44.6 8.2C42.6 6.4 40.6 5.4 38 5M45.8 10.4C43.4 9.6 41.2 9.4 39 9.8M50 9.6C51 5 53.4 2.4 57 1M51.6 8C53.6 6 55.6 5 58.2 4.6M50.6 10.2C53 9.4 55.2 9.2 57.4 9.6"
@@ -288,39 +288,71 @@ const Reindeer = ({ x }) => (
       strokeLinecap="round"
       fill="none"
     />
+    {lead ? (
+      <>
+        <circle cx="54.6" cy="14.6" r="4.6" fill="var(--color-beacon)" opacity="0.28" />
+        <circle cx="54.6" cy="14.6" r="2.3" fill="var(--color-beacon)" />
+      </>
+    ) : null}
   </g>
 )
 
 /**
- * The sleigh: scrolled runner, a seat that dips between a high back and a
- * raised front lip, a sack in the back, and a driver leaning into the reins.
+ * The sleigh and its driver.
+ *
+ * Santa is the one thing here that cannot work as a silhouette — at this
+ * size a grey shape is just a grey shape. What makes him read is colour
+ * blocking: red coat, white beard and hat trim, dark belt, gold buckle.
+ *
+ * The proportions matter more than the detail. The brim sits above the
+ * eyeline and the beard starts below the mouth, so there is a clear band
+ * of face between them; without that gap he is a hat on top of a beard.
  */
 const Sleigh = () => (
   <g>
+    {/* runner, with its scroll at the front */}
     <path
-      d="M2 33h28c7 0 11.5-3.5 13-8.5c0.8-2.7-2-3.7-3-1.5c-0.8 1.8 0.8 3 2.2 2.2"
-      stroke="currentColor"
+      d="M1 35h32c7 0 11-3.5 12.5-8.5c0.8-2.7-2-3.7-3-1.5c-0.8 1.8 0.8 3 2.2 2.2"
+      stroke="var(--color-amber)"
       strokeWidth="1.9"
       strokeLinecap="round"
       fill="none"
     />
-    <path d="M10 33v-5M26 33v-5" stroke="currentColor" strokeWidth="1.7" />
+    <path d="M10 35v-4M29 35v-4" stroke="var(--color-amber)" strokeWidth="1.7" />
+
+    {/* body */}
+    <path d="M3 32C1 23.5 4 19 11 19h27c-1 6-5 11-10 13Z" fill="var(--color-beacon)" />
+    <path d="M3.8 28.4H34" stroke="var(--color-amber)" strokeWidth="1.1" opacity="0.85" />
+
+    {/* sack of presents, riding behind him */}
+    <path d="M4 19C3 11 6.5 6.5 11 6.5S19 11 17 19Z" fill="currentColor" opacity="0.7" />
+    <path d="M8 7.2c1.6-1.5 3.6-1.5 5.2 0" stroke="var(--color-amber)" strokeWidth="1.2" fill="none" />
+
+    {/* coat, belt, buckle */}
+    <path d="M21.4 23C20.8 17 23 13.6 27.2 13.6S33.6 17 33 23Z" fill="var(--color-beacon)" />
+    <path d="M21 18.6h12.2v2H21Z" fill="#160d06" />
+    <path d="M26.2 18.3h2.1v2.6h-2.1Z" fill="var(--color-amber)" />
+
+    {/* arm on the reins, with a fur cuff */}
     <path
-      d="M6 29C4 20 7 13 14 13C17 13 18 15 18 18H28C29 15 31 13 34 13C33 20 29.5 26 25 29Z"
-      fill="currentColor"
-    />
-    <path d="M8 13C7 7 10 3.5 14 3.5C18 3.5 20.5 7.5 19 13Z" fill="currentColor" />
-    <path d="M21 18C20.5 13.5 22.5 11 25 11C27.5 11 29.5 13.5 29 18Z" fill="currentColor" />
-    <circle cx="25" cy="8.4" r="3.3" fill="currentColor" />
-    <path d="M22.6 6C24.2 2.8 27.4 2.4 28.8 4.6L25.4 6.8Z" fill="currentColor" />
-    <circle cx="29.4" cy="4.2" r="1.5" fill="currentColor" />
-    <path
-      d="M28 14C31 13.4 34 13.6 37 14.6"
-      stroke="currentColor"
-      strokeWidth="1.8"
+      d="M32.4 16c2.6 0.4 5 1.2 7 2.4"
+      stroke="var(--color-beacon)"
+      strokeWidth="2.8"
       strokeLinecap="round"
       fill="none"
     />
+    <circle cx="39.6" cy="18.6" r="1.5" fill="var(--color-ink)" />
+
+    {/* face, then beard below the mouth, then brim above the eyes */}
+    <circle cx="27.2" cy="8.4" r="3.5" fill="#f0cfae" />
+    <circle cx="29.8" cy="8.4" r="0.95" fill="#dca882" />
+    <path
+      d="M23.6 8.2C22.8 14.4 25.4 17.4 28.2 16.8C31.2 16.2 32 11.6 31 8C29 10.6 25.6 10.6 23.6 8.2Z"
+      fill="var(--color-ink)"
+    />
+    <path d="M31.4 6.4C30.8 2.2 27.2 0.2 23.6 1.4C21.4 2.2 20 3.4 19.2 4.6L22.6 6.2Z" fill="var(--color-beacon)" />
+    <rect x="22.4" y="4.6" width="9.4" height="2.3" rx="1.15" fill="var(--color-ink)" />
+    <circle cx="18.8" cy="4.6" r="1.7" fill="var(--color-ink)" />
   </g>
 )
 
@@ -336,18 +368,18 @@ function SleighSky() {
       aria-hidden="true"
       className="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 overflow-hidden"
     >
-      <div className="sleigh-run absolute top-10 left-0 w-80 text-ink/80 sm:w-[27rem]">
-        <svg viewBox="0 0 272 38" fill="none" className="w-full">
+      <div className="sleigh-run absolute top-8 left-0 w-[23rem] text-ink/80 sm:w-[34rem]">
+        <svg viewBox="0 0 288 38" fill="none" className="w-full">
           <path
-            d="M37 15C52 13 60 12 74 12M125 12h11M189 12h11"
+            d="M41 18C58 15 66 13 84 13M133 13h11M197 13h11"
             stroke="currentColor"
             strokeWidth="1.1"
-            opacity="0.6"
+            opacity="0.55"
           />
           <Sleigh />
-          <Reindeer x={72} />
-          <Reindeer x={136} />
-          <Reindeer x={200} />
+          <Reindeer x={80} />
+          <Reindeer x={144} />
+          <Reindeer x={208} lead />
         </svg>
       </div>
     </div>
