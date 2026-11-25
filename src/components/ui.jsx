@@ -6,6 +6,11 @@ const ACCENT = {
   sky: 'var(--color-sky)',
   magenta: 'var(--color-magenta)',
   annunciator: 'var(--color-annunciator)',
+  // Anti-collision beacon red, which doubles as the Christmas red.
+  beacon: 'var(--color-beacon)',
+  green: 'var(--color-annunciator)',
+  red: 'var(--color-beacon)',
+  mute: 'var(--color-mute)',
 }
 export const accentVar = (name) => ACCENT[name] ?? ACCENT.cyan
 

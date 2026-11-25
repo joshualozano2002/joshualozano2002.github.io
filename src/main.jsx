@@ -8,6 +8,7 @@ import Campaign from './routes/Campaign'
 import Dossier from './routes/Dossier'
 import Contact from './routes/Contact'
 import DraftFight from './routes/DraftFight'
+import Christmas from './routes/Christmas'
 import NotFound from './routes/NotFound'
 import { missions } from './data/missions'
 
@@ -29,6 +30,8 @@ export const routes = [
       { path: 'contact', element: <Contact /> },
       // Unlisted: reached by invite link, deliberately kept out of the nav.
       { path: 'draft-fight', element: <DraftFight /> },
+      // Unlisted and noindex: shared with family, not with recruiters.
+      { path: 'christmas', element: <Christmas /> },
       { path: '*', element: <NotFound /> },
     ],
   },
