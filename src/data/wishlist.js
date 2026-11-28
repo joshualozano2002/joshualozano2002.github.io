@@ -107,6 +107,18 @@ export const christmas = {
           high: 900,
         },
         {
+          id: '09',
+          name: 'Sonos Arc Ultra Soundbar',
+          spec: 'Black',
+          href: 'https://www.sonos.com/en-us/shop/arc-ultra',
+          source: 'Sonos',
+          display: '$849',
+          status: 'Listed',
+          tone: 'green',
+          low: 849,
+          high: 849,
+        },
+        {
           id: '14',
           name: 'Ray-Ban Meta Wayfarer Gen 2',
           spec: 'Matte black · grey transition lenses',
@@ -211,18 +223,6 @@ export const christmas = {
       hold: 'Hold 03',
       title: 'Home & Lifestyle',
       items: [
-        {
-          id: '09',
-          name: 'Sonos Arc Ultra Soundbar',
-          spec: 'Black',
-          href: 'https://www.sonos.com/en-us/shop/arc-ultra',
-          source: 'Sonos',
-          display: '$849',
-          status: 'Listed',
-          tone: 'green',
-          low: 849,
-          high: 849,
-        },
         {
           id: '10',
           name: 'Sonos surround expansion',
