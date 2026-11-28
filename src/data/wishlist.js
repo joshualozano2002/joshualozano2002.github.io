@@ -119,18 +119,6 @@ export const christmas = {
           high: 849,
         },
         {
-          id: '14',
-          name: 'Ray-Ban Meta Wayfarer Gen 2',
-          spec: 'Matte black · grey transition lenses',
-          href: 'https://www.meta.com/ai-glasses/ray-ban-meta-wayfarer-gen-2/',
-          source: 'Meta',
-          display: '$344.99',
-          status: 'Listed',
-          tone: 'green',
-          low: 344.99,
-          high: 344.99,
-        },
-        {
           id: '01',
           name: 'Anker Nano 100W 7-in-1 Charging Station',
           spec: 'Black · 100W shared · 7 ports',
