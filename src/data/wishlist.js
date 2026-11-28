@@ -72,6 +72,18 @@ export const christmas = {
           source: 'Markertek',
         },
         {
+          id: '11',
+          name: 'Secretlab MAGNUS Pro XL Standing Desk',
+          spec: 'Black',
+          href: 'https://secretlab.co/products/magnus-pro',
+          source: 'Secretlab',
+          display: '$949',
+          status: 'Listed',
+          tone: 'green',
+          low: 949,
+          high: 949,
+        },
+        {
           id: '04',
           name: 'SteelSeries Arctis Nova Pro Wireless',
           spec: 'Headset · PlayStation / PC',
@@ -106,14 +118,6 @@ export const christmas = {
           low: 344.99,
           high: 344.99,
         },
-      ],
-    },
-
-    {
-      id: 'tech',
-      hold: 'Hold 02',
-      title: 'Technology & Gaming',
-      items: [
         {
           id: '01',
           name: 'Anker Nano 100W 7-in-1 Charging Station',
@@ -126,6 +130,14 @@ export const christmas = {
           href: 'https://a.co/d/000M3TFG',
           source: 'Amazon',
         },
+      ],
+    },
+
+    {
+      id: 'tech',
+      hold: 'Hold 02',
+      title: 'Technology & Gaming',
+      items: [
         {
           id: '05',
           name: 'Razer Basilisk V4 Pro',
@@ -224,18 +236,6 @@ export const christmas = {
           tone: 'mute',
           low: null,
           high: null,
-        },
-        {
-          id: '11',
-          name: 'Secretlab MAGNUS Pro XL Standing Desk',
-          spec: 'Black',
-          href: 'https://secretlab.co/products/magnus-pro',
-          source: 'Secretlab',
-          display: '$949',
-          status: 'Listed',
-          tone: 'green',
-          low: 949,
-          high: 949,
         },
         {
           id: '12',
