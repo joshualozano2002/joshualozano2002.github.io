@@ -426,7 +426,7 @@ function Thumb({ item, className = '' }) {
   )
 }
 
-function Row({ item, lit, tone, shopping }) {
+function Row({ item, lit, tone, shopping, rank }) {
   const deps = dependencies(item)
   const claim = shopping.status === 'open' ? shopping.claims.get(item.id) : null
   const taken = Boolean(claim)
@@ -440,7 +440,7 @@ function Row({ item, lit, tone, shopping }) {
         <Lamp color={tone} on={lit} />
       </span>
       <span className="readout text-[11px] tracking-[0.2em] text-mute sm:text-[10px]">
-        {item.id}
+        {rank ? `#${rank}` : item.id}
       </span>
     </>
   )
@@ -738,9 +738,10 @@ export default function Christmas() {
 
                 <Reveal>
                   <ul className="mt-4 divide-y divide-hairline">
-                    {group.items.map((item) => (
+                    {group.items.map((item, ii) => (
                       <Row
                         key={item.id}
+                        rank={group.ranked ? ii + 1 : null}
                         item={item}
                         lit={item.low != null}
                         tone={toneAt(allItems.indexOf(item))}

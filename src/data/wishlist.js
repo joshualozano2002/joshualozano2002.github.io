@@ -25,22 +25,13 @@ export const christmas = {
 
   groups: [
     {
-      id: 'tech',
+      id: 'wanted',
       hold: 'Hold 01',
-      title: 'Technology & Gaming',
+      title: 'Wanted Most',
+      // Rows here print their place in line (#1, #2…) instead of their id.
+      ranked: true,
+      note: 'These are the ones I want the most, in order: the monitor first, then down the list. Everything after this hold is the rest.',
       items: [
-        {
-          id: '01',
-          name: 'Anker Nano 100W 7-in-1 Charging Station',
-          spec: 'Black · 100W shared · 7 ports',
-          display: '$79.99',
-          status: 'Listed',
-          tone: 'green',
-          low: 79.99,
-          high: 79.99,
-          href: 'https://a.co/d/000M3TFG',
-          source: 'Amazon',
-        },
         {
           id: '02',
           name: 'Alienware AW3225QF 32" QD-OLED',
@@ -68,6 +59,19 @@ export const christmas = {
           source: 'Micro Center',
         },
         {
+          id: '07',
+          name: 'BZBGEAR BG-Air4Kast Wireless HDMI Kit',
+          spec: '4K60 · 5GHz · 164ft · IR passback',
+          note: 'Replaces the Measy, which could never have worked: 60GHz carries uncompressed 4K but will not pass through a wall, and this needs to reach another room eventually. 5GHz does go through walls, and most kits that do pay for it by dropping to 4K30 or quietly outputting 1080p — this is the one that holds 4K60, which is why it won CEDIA and ISE awards. Expect roughly half the rated range once there are two walls in the way.',
+          display: '$279 – $349',
+          status: 'Range',
+          tone: 'amber',
+          low: 279,
+          high: 349,
+          href: 'https://www.markertek.com/product/bg-air4kast/bzbgear-bg-air4kast-4k60-uhd-hdmi-2-0-wireless-extender-kit-with-ir-up-to-50-meters-164-feet',
+          source: 'Markertek',
+        },
+        {
           id: '04',
           name: 'SteelSeries Arctis Nova Pro Wireless',
           spec: 'Headset · PlayStation / PC',
@@ -78,6 +82,49 @@ export const christmas = {
           tone: 'green',
           low: 229.99,
           high: 229.99,
+        },
+        {
+          id: '16',
+          name: 'Tesla ceramic window tint',
+          spec: 'Ceramic film · full vehicle',
+          note: 'Ceramic rather than dyed. Price moves with coverage and which shop does it.',
+          display: '$400 – $900',
+          status: 'Range',
+          tone: 'amber',
+          low: 400,
+          high: 900,
+        },
+        {
+          id: '14',
+          name: 'Ray-Ban Meta Wayfarer Gen 2',
+          spec: 'Matte black · grey transition lenses',
+          href: 'https://www.meta.com/ai-glasses/ray-ban-meta-wayfarer-gen-2/',
+          source: 'Meta',
+          display: '$344.99',
+          status: 'Listed',
+          tone: 'green',
+          low: 344.99,
+          high: 344.99,
+        },
+      ],
+    },
+
+    {
+      id: 'tech',
+      hold: 'Hold 02',
+      title: 'Technology & Gaming',
+      items: [
+        {
+          id: '01',
+          name: 'Anker Nano 100W 7-in-1 Charging Station',
+          spec: 'Black · 100W shared · 7 ports',
+          display: '$79.99',
+          status: 'Listed',
+          tone: 'green',
+          low: 79.99,
+          high: 79.99,
+          href: 'https://a.co/d/000M3TFG',
+          source: 'Amazon',
         },
         {
           id: '05',
@@ -102,19 +149,6 @@ export const christmas = {
           tone: 'green',
           low: 169.99,
           high: 169.99,
-        },
-        {
-          id: '07',
-          name: 'BZBGEAR BG-Air4Kast Wireless HDMI Kit',
-          spec: '4K60 · 5GHz · 164ft · IR passback',
-          note: 'Replaces the Measy, which could never have worked: 60GHz carries uncompressed 4K but will not pass through a wall, and this needs to reach another room eventually. 5GHz does go through walls, and most kits that do pay for it by dropping to 4K30 or quietly outputting 1080p — this is the one that holds 4K60, which is why it won CEDIA and ISE awards. Expect roughly half the rated range once there are two walls in the way.',
-          display: '$279 – $349',
-          status: 'Range',
-          tone: 'amber',
-          low: 279,
-          high: 349,
-          href: 'https://www.markertek.com/product/bg-air4kast/bzbgear-bg-air4kast-4k60-uhd-hdmi-2-0-wireless-extender-kit-with-ir-up-to-50-meters-164-feet',
-          source: 'Markertek',
         },
         {
           id: '08',
@@ -162,7 +196,7 @@ export const christmas = {
 
     {
       id: 'home',
-      hold: 'Hold 02',
+      hold: 'Hold 03',
       title: 'Home & Lifestyle',
       items: [
         {
@@ -228,18 +262,6 @@ export const christmas = {
           high: 39.99,
         },
         {
-          id: '14',
-          name: 'Ray-Ban Meta Wayfarer Gen 2',
-          spec: 'Matte black · grey transition lenses',
-          href: 'https://www.meta.com/ai-glasses/ray-ban-meta-wayfarer-gen-2/',
-          source: 'Meta',
-          display: '$344.99',
-          status: 'Listed',
-          tone: 'green',
-          low: 344.99,
-          high: 344.99,
-        },
-        {
           id: '15',
           name: 'Apple Watch Ultra 4',
           spec: 'Black titanium',
@@ -251,23 +273,12 @@ export const christmas = {
           low: 799,
           high: 799,
         },
-        {
-          id: '16',
-          name: 'Tesla ceramic window tint',
-          spec: 'Ceramic film · full vehicle',
-          note: 'Ceramic rather than dyed. Price moves with coverage and which shop does it.',
-          display: '$400 – $900',
-          status: 'Range',
-          tone: 'amber',
-          low: 400,
-          high: 900,
-        },
       ],
     },
 
     {
       id: 'clubs',
-      hold: 'Hold 03',
+      hold: 'Hold 04',
       title: 'Golf Clubs & Bag',
       note: 'All clubs brand-new and right-handed. Shaft flex and final configurations still to be decided.',
       items: [
@@ -362,7 +373,7 @@ export const christmas = {
 
     {
       id: 'golftech',
-      hold: 'Hold 04',
+      hold: 'Hold 05',
       title: 'Golf Technology',
       items: [
         {
@@ -395,7 +406,7 @@ export const christmas = {
 
     {
       id: 'everyday',
-      hold: 'Hold 05',
+      hold: 'Hold 06',
       title: 'Clothing & Everyday Essentials',
       note: 'No fixed models here — brands are suggestions, not requirements.',
       items: [
@@ -445,7 +456,7 @@ export const christmas = {
 
     {
       id: 'smaller',
-      hold: 'Hold 06',
+      hold: 'Hold 07',
       title: 'Smaller Things',
       note: 'Everything here is under $100. The rest of the list is top-heavy, and nobody should have to buy a monitor to join in.',
       items: [
@@ -526,19 +537,6 @@ export const christmas = {
           high: 58,
           href: 'https://www.titleist.com/product/pro-v1/005PV1T.html',
           source: 'Titleist',
-        },
-        {
-          id: '37',
-          name: 'Apple AirTag, 4-pack',
-          spec: 'Four trackers',
-          note: 'One goes in the golf bag, which is about to be worth more than the car it travels in. Singles are around $29 if four is too many.',
-          display: '$99',
-          status: 'Listed',
-          tone: 'green',
-          low: 99,
-          high: 99,
-          href: 'https://www.apple.com/shop/buy-airtag/airtag/4-pack',
-          source: 'Apple',
         },
         {
           id: '38',
